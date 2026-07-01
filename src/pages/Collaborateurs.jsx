@@ -105,8 +105,11 @@ export default function Collaborateurs() {
   }
 
   async function ajouterEntreprise(entreprise) {
+    // Entreprise créée — on propose d'ajouter un premier contact
     setModal(null)
-    charger()
+    await charger()
+    setEntrepriseSelectee(entreprise)
+    setTimeout(() => setModal('contact'), 200)
   }
 
   function toggleEntr(eid) {
