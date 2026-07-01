@@ -22,6 +22,7 @@ export default function Accueil() {
   const [projets, setProjets] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploadingId, setUploadingId] = useState(null)
+  const [hoveredId, setHoveredId] = useState(null)
   const fileRefs = useRef({})
 
   useEffect(() => { chargerProjets() }, [])
@@ -39,25 +40,22 @@ export default function Accueil() {
   async function handleImageUpload(e, projet) {
     const file = e.target.files[0]
     if (!file) return
-    // Réinitialiser l'input pour permettre de re-sélectionner le même fichier
     e.target.value = ''
     setUploadingId(projet.id)
 
     const ext = file.name.split('.').pop()
-    // Nom fixe par projet — on écrase toujours le même fichier
     const path = `projets/${projet.id}/cover.${ext}`
 
-    // Supprimer toutes les anciennes versions de cover (peu importe l'extension)
+    // Supprimer l'ancienne image
     const { data: existingFiles } = await supabase.storage
       .from('Photos')
       .list(`projets/${projet.id}`)
-
     if (existingFiles && existingFiles.length > 0) {
       const toDelete = existingFiles.map(f => `projets/${projet.id}/${f.name}`)
       await supabase.storage.from('Photos').remove(toDelete)
     }
 
-    // Upload du nouveau fichier
+    // Upload nouvelle image
     const { error: uploadError } = await supabase.storage
       .from('Photos')
       .upload(path, file)
@@ -68,14 +66,10 @@ export default function Accueil() {
       return
     }
 
-    // URL publique avec cache-buster pour forcer le rechargement
     const { data: urlData } = supabase.storage.from('Photos').getPublicUrl(path)
     const image_url = `${urlData.publicUrl}?t=${Date.now()}`
 
-    // Mettre à jour la BDD
     await supabase.from('projets').update({ image_url }).eq('id', projet.id)
-
-    // Mettre à jour l'état local immédiatement
     setProjets(prev => prev.map(p => p.id === projet.id ? { ...p, image_url } : p))
     setUploadingId(null)
   }
@@ -90,19 +84,20 @@ export default function Accueil() {
           <div className="grid-projets">
             {projets.map((p, i) => {
               const badge = PHASES_BADGES[p.phase] || PHASES_BADGES.EXE
+              const isHovered = hoveredId === p.id
+              const isUploading = uploadingId === p.id
+
               return (
                 <div key={p.id} className="card">
-                  {/* Zone image — clic pour uploader ou remplacer */}
+                  {/* Zone image */}
                   <div
                     className="projet-img"
                     style={{ position: 'relative', cursor: 'pointer' }}
-                    onClick={e => {
-                      e.stopPropagation()
-                      fileRefs.current[p.id]?.click()
-                    }}
-                    title="Cliquer pour changer l'image"
+                    onClick={e => { e.stopPropagation(); fileRefs.current[p.id]?.click() }}
+                    onMouseEnter={() => setHoveredId(p.id)}
+                    onMouseLeave={() => setHoveredId(null)}
                   >
-                    {uploadingId === p.id ? (
+                    {isUploading ? (
                       <div style={{ fontSize: 13, color: '#888' }}>⏳ Upload…</div>
                     ) : p.image_url ? (
                       <>
@@ -111,13 +106,25 @@ export default function Accueil() {
                           alt={p.nom}
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         />
-                        {/* Overlay "Changer" au survol */}
-                        <div className="img-overlay">✏️ Changer</div>
+                        {/* Overlay visible uniquement au survol */}
+                        {isHovered && (
+                          <div style={{
+                            position: 'absolute', inset: 0,
+                            background: 'rgba(0,0,0,0.4)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: 'white', fontSize: 13, fontWeight: 500, gap: 6
+                          }}>
+                            ✏️ Changer la photo
+                          </div>
+                        )}
                       </>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                         <span style={{ fontSize: 32 }}>{EMOJIS[i % EMOJIS.length]}</span>
-                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)', background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: 10 }}>+ Photo</span>
+                        <span style={{
+                          fontSize: 11, color: 'rgba(255,255,255,0.95)',
+                          background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: 10
+                        }}>+ Photo</span>
                       </div>
                     )}
                     <input
@@ -129,7 +136,7 @@ export default function Accueil() {
                     />
                   </div>
 
-                  {/* Corps — navigation vers le projet */}
+                  {/* Corps — navigation */}
                   <div
                     className="projet-body"
                     style={{ cursor: 'pointer' }}
