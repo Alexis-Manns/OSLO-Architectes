@@ -45,7 +45,7 @@ export default function Accueil() {
     const ext = file.name.split('.').pop()
     const path = `projets/${projetId}/cover.${ext}`
     const { error: uploadError } = await supabase.storage
-      .from('photos')
+      .from('Photos')
       .upload(path, file, { upsert: true })
 
     if (uploadError) {
@@ -55,7 +55,7 @@ export default function Accueil() {
     }
 
     // Récupérer l'URL publique
-    const { data: urlData } = supabase.storage.from('photos').getPublicUrl(path)
+    const { data: urlData } = supabase.storage.from('Photos').getPublicUrl(path)
     const image_url = urlData.publicUrl
 
     // Mettre à jour la BDD
