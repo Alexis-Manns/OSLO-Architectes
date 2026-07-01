@@ -32,9 +32,9 @@ export default function FicheControle() {
     for (const file of files) {
       const ext = file.name.split('.').pop()
       const path = `controles/${id}/${cid}/${Date.now()}.${ext}`
-      const { data, error } = await supabase.storage.from('photos').upload(path, file)
+      const { data, error } = await supabase.storage.from('Photos').upload(path, file)
       if (!error) {
-        const { data: url } = supabase.storage.from('photos').getPublicUrl(path)
+        const { data: url } = supabase.storage.from('Photos').getPublicUrl(path)
         setPhotos(p => [...p, url.publicUrl])
       }
     }
