@@ -31,7 +31,7 @@ export default function Accueil() {
     const { data, error } = await supabase
       .from('projets')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('reference', { ascending: true })
     if (error) console.error(error)
     setProjets(data || [])
     setLoading(false)
