@@ -13,26 +13,51 @@ export function FicheCollaborateur() {
   const collabInitial = location.state?.collab || {}
 
   const [form, setForm] = useState({
-    prenom:    collabInitial.prenom    || '',
-    nom:       collabInitial.nom       || '',
-    email:     collabInitial.email     || '',
-    telephone: collabInitial.telephone || '',
-    role:      collabInitial.role      || '',
-    specialite:collabInitial.specialite|| '',
+    prenom:     collabInitial.prenom     || '',
+    nom:        collabInitial.nom        || '',
+    email:      collabInitial.email      || '',
+    telephone:  collabInitial.telephone  || '',
+    role:       collabInitial.role       || '',
+    specialite: collabInitial.specialite || '',
   })
   const [roleProjet, setRoleProjet] = useState(collabInitial.role_projet || '')
   const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [saved, setSaved]   = useState(false)
+  const [erreur, setErreur] = useState(null)
   const [modifie, setModifie] = useState(collabInitial.updated_at || null)
+
+  // Charger les données fraîches depuis Supabase au montage
+  useEffect(() => {
+    async function charger() {
+      const { data, error } = await supabase
+        .from('collaborateurs')
+        .select('*')
+        .eq('id', cid)
+        .single()
+      if (data) {
+        setForm({
+          prenom:     data.prenom     || '',
+          nom:        data.nom        || '',
+          email:      data.email      || '',
+          telephone:  data.telephone  || '',
+          role:       data.role       || '',
+          specialite: data.specialite || '',
+        })
+        setModifie(data.updated_at || null)
+      }
+    }
+    if (cid) charger()
+  }, [cid])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   async function enregistrer() {
     setSaving(true)
+    setErreur(null)
     const now = new Date().toISOString()
 
-    // Mise à jour de la fiche globale dans collaborateurs
-    const { error } = await supabase
+    // 1. Mise à jour fiche globale collaborateur
+    const { error: errCollab } = await supabase
       .from('collaborateurs')
       .update({
         prenom:     form.prenom,
@@ -45,7 +70,13 @@ export function FicheCollaborateur() {
       })
       .eq('id', cid)
 
-    // Mise à jour du rôle sur ce projet spécifique
+    if (errCollab) {
+      setErreur('Erreur : ' + errCollab.message)
+      setSaving(false)
+      return
+    }
+
+    // 2. Mise à jour rôle sur ce projet
     if (collabInitial.affectation_id) {
       await supabase
         .from('affectations')
@@ -53,11 +84,9 @@ export function FicheCollaborateur() {
         .eq('id', collabInitial.affectation_id)
     }
 
-    if (!error) {
-      setModifie(now)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-    }
+    setModifie(now)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2500)
     setSaving(false)
   }
 
@@ -75,6 +104,12 @@ export function FicheCollaborateur() {
             ● Modifié le {new Date(modifie).toLocaleDateString('fr-FR')}
           </div>
         )}
+        {erreur && (
+          <div style={{ background: '#FCEBEB', border: '1px solid #F09595', color: '#A32D2D', padding: '10px 14px', borderRadius: 8, marginBottom: 14, fontSize: 13 }}>
+            {erreur}
+          </div>
+        )}
+
         <div className="fiche-header">
           <Avatar nom={form.nom} prenom={form.prenom} size={52} />
           <div>
@@ -105,12 +140,8 @@ export function FicheCollaborateur() {
           <label className="form-label">Rôle général</label>
           <select className="form-input" value={form.role} onChange={e => set('role', e.target.value)}>
             <option value="">—</option>
-            <option>Associé</option>
-            <option>Pilote référent</option>
-            <option>Architecte</option>
-            <option>Dessinateur</option>
-            <option>Chef de projet</option>
-            <option>Ingénieur</option>
+            <option>Associé</option><option>Pilote référent</option><option>Architecte</option>
+            <option>Dessinateur</option><option>Chef de projet</option><option>Ingénieur</option>
           </select>
         </div>
         <div className="form-group">
@@ -118,16 +149,10 @@ export function FicheCollaborateur() {
           <input className="form-input" value={form.specialite} onChange={e => set('specialite', e.target.value)} />
         </div>
         <div className="form-group">
-          <label className="form-label" style={{ color: 'var(--orange)', fontWeight: 600 }}>
-            Rôle sur ce projet
-          </label>
-          <input
-            className="form-input"
-            value={roleProjet}
-            onChange={e => setRoleProjet(e.target.value)}
-            style={{ borderColor: 'var(--orange)' }}
-            placeholder="Ex: Cheffe de projet, Architecte exécution…"
-          />
+          <label className="form-label" style={{ color: 'var(--orange)', fontWeight: 600 }}>Rôle sur ce projet</label>
+          <input className="form-input" value={roleProjet} onChange={e => setRoleProjet(e.target.value)}
+            style={{ borderColor: 'rgba(255,140,0,0.4)' }}
+            placeholder="Ex: Cheffe de projet, Architecte exécution…" />
         </div>
 
         <div className="btn-row">
@@ -153,22 +178,48 @@ export function FicheContact() {
   const entreprise = location.state?.entreprise || {}
 
   const [form, setForm] = useState({
-    prenom:                contactInitial.prenom                || '',
-    nom:                   contactInitial.nom                   || '',
-    fonction:              contactInitial.fonction              || '',
-    telephone:             contactInitial.telephone             || '',
-    email:                 contactInitial.email                 || '',
-    note:                  contactInitial.note                  || '',
+    prenom:                 contactInitial.prenom                || '',
+    nom:                    contactInitial.nom                   || '',
+    fonction:               contactInitial.fonction              || '',
+    telephone:              contactInitial.telephone             || '',
+    email:                  contactInitial.email                 || '',
+    note:                   contactInitial.note                  || '',
     interlocuteur_principal: contactInitial.interlocuteur_principal ? 'Oui' : 'Non',
   })
   const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [saved, setSaved]   = useState(false)
+  const [erreur, setErreur] = useState(null)
   const [modifie, setModifie] = useState(contactInitial.updated_at || null)
+
+  // Charger données fraîches
+  useEffect(() => {
+    async function charger() {
+      const { data } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('id', cid)
+        .single()
+      if (data) {
+        setForm({
+          prenom:                  data.prenom     || '',
+          nom:                     data.nom        || '',
+          fonction:                data.fonction   || '',
+          telephone:               data.telephone  || '',
+          email:                   data.email      || '',
+          note:                    data.note       || '',
+          interlocuteur_principal: data.interlocuteur_principal ? 'Oui' : 'Non',
+        })
+        setModifie(data.updated_at || null)
+      }
+    }
+    if (cid) charger()
+  }, [cid])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   async function enregistrer() {
     setSaving(true)
+    setErreur(null)
     const now = new Date().toISOString()
 
     const { error } = await supabase
@@ -185,11 +236,15 @@ export function FicheContact() {
       })
       .eq('id', cid)
 
-    if (!error) {
-      setModifie(now)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
+    if (error) {
+      setErreur('Erreur : ' + error.message)
+      setSaving(false)
+      return
     }
+
+    setModifie(now)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2500)
     setSaving(false)
   }
 
@@ -207,6 +262,12 @@ export function FicheContact() {
             ● Modifié le {new Date(modifie).toLocaleDateString('fr-FR')}
           </div>
         )}
+        {erreur && (
+          <div style={{ background: '#FCEBEB', border: '1px solid #F09595', color: '#A32D2D', padding: '10px 14px', borderRadius: 8, marginBottom: 14, fontSize: 13 }}>
+            {erreur}
+          </div>
+        )}
+
         <div className="fiche-header">
           <Avatar nom={form.nom} prenom={form.prenom} size={52} />
           <div>
@@ -240,8 +301,7 @@ export function FicheContact() {
         <div className="form-group">
           <label className="form-label">Interlocuteur principal</label>
           <select className="form-input" value={form.interlocuteur_principal} onChange={e => set('interlocuteur_principal', e.target.value)}>
-            <option>Non</option>
-            <option>Oui</option>
+            <option>Non</option><option>Oui</option>
           </select>
         </div>
         <div className="form-group">
@@ -271,28 +331,26 @@ export function FicheGuide() {
   const g = location.state?.guide || {}
 
   const [form, setForm] = useState({
-    titre:    g.titre    || '',
-    categorie:g.categorie|| 'Normes / DTU',
-    resume:   g.resume   || '',
-    lien:     g.lien_document || '',
+    titre:     g.titre         || '',
+    categorie: g.categorie     || 'Normes / DTU',
+    resume:    g.resume        || '',
+    lien:      g.lien_document || '',
   })
   const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [saved, setSaved]   = useState(false)
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   async function enregistrer() {
     setSaving(true)
-    const { error } = await supabase
-      .from('guides')
-      .update({
-        titre:          form.titre,
-        categorie:      form.categorie,
-        resume:         form.resume,
-        lien_document:  form.lien,
-        updated_at:     new Date().toISOString(),
-      })
-      .eq('id', gid)
-    if (!error) { setSaved(true); setTimeout(() => setSaved(false), 2000) }
+    await supabase.from('guides').update({
+      titre:         form.titre,
+      categorie:     form.categorie,
+      resume:        form.resume,
+      lien_document: form.lien,
+      updated_at:    new Date().toISOString(),
+    }).eq('id', gid)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2500)
     setSaving(false)
   }
 
@@ -312,7 +370,7 @@ export function FicheGuide() {
           </select>
         </div>
         <div className="form-group"><label className="form-label">Résumé / Points clés</label><textarea className="form-input" value={form.resume} onChange={e => set('resume', e.target.value)} /></div>
-        <div className="form-group"><label className="form-label">Lien document (URL)</label><input className="form-input" type="url" value={form.lien} onChange={e => set('lien', e.target.value)} placeholder="https://…" /></div>
+        <div className="form-group"><label className="form-label">Lien document</label><input className="form-input" type="url" value={form.lien} onChange={e => set('lien', e.target.value)} placeholder="https://…" /></div>
         <div className="btn-row">
           <button className="btn-save" onClick={enregistrer} disabled={saving}>
             {saving ? 'Enregistrement…' : saved ? '✓ Enregistré' : 'Enregistrer'}
