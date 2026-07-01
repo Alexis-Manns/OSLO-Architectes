@@ -16,29 +16,30 @@ export default function Collaborateurs() {
   const [entreprises, setEntreprises] = useState([])
   const [deplies, setDeplies] = useState({})
   const [loading, setLoading] = useState(true)
-  const [modal, setModal] = useState(null) // 'collab' | 'contact' | 'entreprise'
+  const [modal, setModal] = useState(null)
   const [entrepriseSelectee, setEntrepriseSelectee] = useState(null)
+  const [confirmSuppr, setConfirmSuppr] = useState(null) // { type, id, nom }
 
   useEffect(() => { charger() }, [id])
 
   async function charger() {
     setLoading(true)
-
-    // Collaborateurs affectés au projet
     const { data: affectations } = await supabase
       .from('affectations')
       .select('*, collaborateurs(*)')
       .eq('projet_id', id)
 
-    // Entreprises et contacts affectés au projet
     const { data: affContacts } = await supabase
       .from('affectations_contacts')
       .select('*, contacts(*, entreprises(*))')
       .eq('projet_id', id)
 
-    setCollabs(affectations?.map(a => ({ ...a.collaborateurs, role_projet: a.role_sur_projet, affectation_id: a.id })) || [])
+    setCollabs(affectations?.map(a => ({
+      ...a.collaborateurs,
+      role_projet: a.role_sur_projet,
+      affectation_id: a.id
+    })) || [])
 
-    // Regrouper contacts par entreprise
     const entreprisesMap = {}
     affContacts?.forEach(ac => {
       const contact = ac.contacts
@@ -58,8 +59,29 @@ export default function Collaborateurs() {
     setLoading(false)
   }
 
+  async function supprimerCollab(collab) {
+    await supabase.from('affectations').delete().eq('id', collab.affectation_id)
+    setConfirmSuppr(null)
+    charger()
+  }
+
+  async function supprimerContact(contact) {
+    await supabase.from('affectations_contacts').delete().eq('id', contact.affectation_id)
+    setConfirmSuppr(null)
+    charger()
+  }
+
+  async function supprimerEntreprise(entreprise) {
+    // Supprimer toutes les affectations de contacts de cette entreprise sur ce projet
+    const contactIds = entreprise.contacts.map(c => c.affectation_id)
+    if (contactIds.length > 0) {
+      await supabase.from('affectations_contacts').delete().in('id', contactIds)
+    }
+    setConfirmSuppr(null)
+    charger()
+  }
+
   async function ajouterCollab(collab) {
-    // Affecter le collaborateur au projet
     await supabase.from('affectations').insert({
       projet_id: id,
       collaborateur_id: collab.id,
@@ -71,7 +93,6 @@ export default function Collaborateurs() {
   }
 
   async function ajouterContact(contact) {
-    // Affecter le contact au projet
     await supabase.from('affectations_contacts').insert({
       projet_id: id,
       contact_id: contact.id,
@@ -84,8 +105,6 @@ export default function Collaborateurs() {
   }
 
   async function ajouterEntreprise(entreprise) {
-    // L'entreprise est liée via ses contacts — on ferme juste le modal
-    // et on invite à ajouter un contact de cette entreprise
     setModal(null)
     charger()
   }
@@ -125,14 +144,23 @@ export default function Collaborateurs() {
               </div>
             )}
             {collabs.map(c => (
-              <div key={c.id} className="list-item"
-                onClick={() => navigate(`/projet/${id}/collaborateurs/${c.id}`, { state: { projet, collab: c } })}>
-                <Avatar nom={c.nom} prenom={c.prenom} />
-                <div className="item-info">
-                  <div className="item-nom">{c.prenom} {c.nom}</div>
-                  <div className="item-sub">{c.role_projet} · {c.email}</div>
+              <div key={c.id} className="list-item" style={{ gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}
+                  onClick={() => navigate(`/projet/${id}/collaborateurs/${c.id}`, { state: { projet, collab: c } })}>
+                  <Avatar nom={c.nom} prenom={c.prenom} />
+                  <div className="item-info">
+                    <div className="item-nom">{c.prenom} {c.nom}</div>
+                    <div className="item-sub">{c.role_projet} · {c.email}</div>
+                  </div>
+                  <span className="arrow">›</span>
                 </div>
-                <span className="arrow">›</span>
+                <button
+                  onClick={e => { e.stopPropagation(); setConfirmSuppr({ type: 'collab', data: c, nom: `${c.prenom} ${c.nom}` }) }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: 18, padding: '4px 6px', flexShrink: 0, borderRadius: 6 }}
+                  onMouseEnter={e => e.currentTarget.style.color = '#E24B4A'}
+                  onMouseLeave={e => e.currentTarget.style.color = '#ccc'}
+                  title="Retirer du projet"
+                >✕</button>
               </div>
             ))}
             <button className="btn-add" onClick={() => setModal('collab')}>+ Ajouter un collaborateur</button>
@@ -148,25 +176,48 @@ export default function Collaborateurs() {
             )}
             {entreprises.map(e => (
               <div key={e.id}>
-                <div className="entr-row" onClick={() => toggleEntr(e.id)}>
-                  <span style={{ fontStyle: 'normal', color: 'var(--texte-sec)' }}>{deplies[e.id] ? '▾' : '›'}</span>
-                  <Avatar nom={e.nom} prenom="" square size={36} />
-                  <div className="item-info">
-                    <div className="item-nom">{e.nom}</div>
-                    <div className="item-sub">{e.type}</div>
+                <div className="entr-row">
+                  <span style={{ fontStyle: 'normal', color: 'var(--texte-sec)', cursor: 'pointer' }}
+                    onClick={() => toggleEntr(e.id)}>
+                    {deplies[e.id] ? '▾' : '›'}
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, cursor: 'pointer' }}
+                    onClick={() => toggleEntr(e.id)}>
+                    <Avatar nom={e.nom} prenom="" square size={36} />
+                    <div className="item-info">
+                      <div className="item-nom">{e.nom}</div>
+                      <div className="item-sub">{e.type}</div>
+                    </div>
                   </div>
+                  <button
+                    onClick={() => setConfirmSuppr({ type: 'entreprise', data: e, nom: e.nom })}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: 18, padding: '4px 6px', borderRadius: 6 }}
+                    onMouseEnter={e => e.currentTarget.style.color = '#E24B4A'}
+                    onMouseLeave={e => e.currentTarget.style.color = '#ccc'}
+                    title="Retirer du projet"
+                  >✕</button>
                 </div>
+
                 {deplies[e.id] && (
                   <div className="contact-indent">
                     {e.contacts.map(c => (
-                      <div key={c.id} className="list-item"
-                        onClick={() => navigate(`/projet/${id}/contacts/${c.id}`, { state: { projet, contact: c, entreprise: e } })}>
-                        <Avatar nom={c.nom} prenom={c.prenom} size={34} />
-                        <div className="item-info">
-                          <div className="item-nom">{c.prenom} {c.nom}</div>
-                          <div className="item-sub">{c.fonction} · {c.telephone}</div>
+                      <div key={c.id} className="list-item" style={{ gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, cursor: 'pointer' }}
+                          onClick={() => navigate(`/projet/${id}/contacts/${c.id}`, { state: { projet, contact: c, entreprise: e } })}>
+                          <Avatar nom={c.nom} prenom={c.prenom} size={34} />
+                          <div className="item-info">
+                            <div className="item-nom">{c.prenom} {c.nom}</div>
+                            <div className="item-sub">{c.fonction} · {c.telephone}</div>
+                          </div>
+                          <span className="arrow">›</span>
                         </div>
-                        <span className="arrow">›</span>
+                        <button
+                          onClick={() => setConfirmSuppr({ type: 'contact', data: c, nom: `${c.prenom} ${c.nom}` })}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: 18, padding: '4px 6px', borderRadius: 6, flexShrink: 0 }}
+                          onMouseEnter={e => e.currentTarget.style.color = '#E24B4A'}
+                          onMouseLeave={e => e.currentTarget.style.color = '#ccc'}
+                          title="Retirer du projet"
+                        >✕</button>
                       </div>
                     ))}
                     <button className="btn-add" style={{ marginBottom: 8 }}
@@ -182,31 +233,47 @@ export default function Collaborateurs() {
         )}
       </div>
 
-      {/* Modals de recherche/création */}
+      {/* Modal confirmation suppression */}
+      {confirmSuppr && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+          zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16
+        }}>
+          <div style={{ background: 'var(--blanc)', borderRadius: 12, padding: 24, maxWidth: 360, width: '100%' }}>
+            <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 8 }}>Retirer du projet</div>
+            <div style={{ color: 'var(--texte-sec)', fontSize: 13, marginBottom: 20 }}>
+              Voulez-vous retirer <strong>{confirmSuppr.nom}</strong> de ce projet ?
+              {confirmSuppr.type === 'entreprise' && (
+                <span style={{ display: 'block', marginTop: 6, color: '#E24B4A' }}>
+                  Tous les contacts de cette entreprise seront également retirés.
+                </span>
+              )}
+              <span style={{ display: 'block', marginTop: 6 }}>La fiche restera dans la base de données.</span>
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                style={{ background: '#E24B4A', color: 'white', border: 'none', padding: '9px 18px', borderRadius: 6, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}
+                onClick={() => {
+                  if (confirmSuppr.type === 'collab') supprimerCollab(confirmSuppr.data)
+                  else if (confirmSuppr.type === 'contact') supprimerContact(confirmSuppr.data)
+                  else if (confirmSuppr.type === 'entreprise') supprimerEntreprise(confirmSuppr.data)
+                }}
+              >Retirer</button>
+              <button className="btn-cancel" onClick={() => setConfirmSuppr(null)}>Annuler</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modals ajout */}
       {modal === 'collab' && (
-        <ModalRecherche
-          type="collaborateur"
-          projetId={id}
-          onSelect={ajouterCollab}
-          onClose={() => setModal(null)}
-        />
+        <ModalRecherche type="collaborateur" projetId={id} onSelect={ajouterCollab} onClose={() => setModal(null)} />
       )}
       {modal === 'contact' && (
-        <ModalRecherche
-          type="contact"
-          projetId={id}
-          entreprise={entrepriseSelectee}
-          onSelect={ajouterContact}
-          onClose={() => { setModal(null); setEntrepriseSelectee(null) }}
-        />
+        <ModalRecherche type="contact" projetId={id} entreprise={entrepriseSelectee} onSelect={ajouterContact} onClose={() => { setModal(null); setEntrepriseSelectee(null) }} />
       )}
       {modal === 'entreprise' && (
-        <ModalRecherche
-          type="entreprise"
-          projetId={id}
-          onSelect={ajouterEntreprise}
-          onClose={() => setModal(null)}
-        />
+        <ModalRecherche type="entreprise" projetId={id} onSelect={ajouterEntreprise} onClose={() => setModal(null)} />
       )}
     </div>
   )
