@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
@@ -21,32 +21,49 @@ export default function Accueil() {
   const navigate = useNavigate()
   const [projets, setProjets] = useState([])
   const [loading, setLoading] = useState(true)
+  const [uploadingId, setUploadingId] = useState(null)
+  const fileRefs = useRef({})
 
-  useEffect(() => {
-    chargerProjets()
-  }, [])
+  useEffect(() => { chargerProjets() }, [])
 
   async function chargerProjets() {
     const { data, error } = await supabase
       .from('projets')
       .select('*')
       .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error(error)
-      // Données de démo si la table n'existe pas encore
-      setProjets([
-        { id: '1', nom: 'Résidence Les Acacias', reference: '2024-047', phase: 'EXE' },
-        { id: '2', nom: 'Tour Horizon',          reference: '2023-031', phase: 'PRO' },
-        { id: '3', nom: 'École Jean Moulin',     reference: '2024-012', phase: 'DCE' },
-        { id: '4', nom: 'Médiathèque Nord',      reference: '2022-089', phase: 'ACT' },
-        { id: '5', nom: 'Villa Solaris',         reference: '2025-003', phase: 'APS' },
-        { id: '6', nom: 'Centre Sportif Est',    reference: '2023-056', phase: 'EXE' },
-      ])
-    } else {
-      setProjets(data || [])
-    }
+    if (error) console.error(error)
+    setProjets(data || [])
     setLoading(false)
+  }
+
+  async function handleImageUpload(e, projetId) {
+    const file = e.target.files[0]
+    if (!file) return
+    setUploadingId(projetId)
+
+    // Upload dans Supabase Storage
+    const ext = file.name.split('.').pop()
+    const path = `projets/${projetId}/cover.${ext}`
+    const { error: uploadError } = await supabase.storage
+      .from('photos')
+      .upload(path, file, { upsert: true })
+
+    if (uploadError) {
+      console.error(uploadError)
+      setUploadingId(null)
+      return
+    }
+
+    // Récupérer l'URL publique
+    const { data: urlData } = supabase.storage.from('photos').getPublicUrl(path)
+    const image_url = urlData.publicUrl
+
+    // Mettre à jour la BDD
+    await supabase.from('projets').update({ image_url }).eq('id', projetId)
+
+    // Mettre à jour l'état local
+    setProjets(prev => prev.map(p => p.id === projetId ? { ...p, image_url } : p))
+    setUploadingId(null)
   }
 
   return (
@@ -60,18 +77,61 @@ export default function Accueil() {
             {projets.map((p, i) => {
               const badge = PHASES_BADGES[p.phase] || PHASES_BADGES.EXE
               return (
-                <div
-                  key={p.id}
-                  className="card"
-                  onClick={() => navigate(`/projet/${p.id}`, { state: { projet: p } })}
-                >
-                  <div className="projet-img">
-                    {p.image_url
-                      ? <img src={p.image_url} alt={p.nom} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      : EMOJIS[i % EMOJIS.length]
-                    }
+                <div key={p.id} className="card">
+                  {/* Zone image cliquable pour upload */}
+                  <div
+                    className="projet-img"
+                    style={{ position: 'relative', cursor: 'pointer' }}
+                    onClick={e => {
+                      e.stopPropagation()
+                      fileRefs.current[p.id]?.click()
+                    }}
+                    title="Cliquer pour changer l'image"
+                  >
+                    {uploadingId === p.id ? (
+                      <div style={{ fontSize: 13, color: '#888' }}>Upload…</div>
+                    ) : p.image_url ? (
+                      <img src={p.image_url} alt={p.nom} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                        <span style={{ fontSize: 32 }}>{EMOJIS[i % EMOJIS.length]}</span>
+                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', background: 'rgba(0,0,0,0.25)', padding: '2px 8px', borderRadius: 10 }}>+ Photo</span>
+                      </div>
+                    )}
+                    {/* Overlay au survol si image déjà présente */}
+                    {p.image_url && (
+                      <div style={{
+                        position: 'absolute', inset: 0, background: 'rgba(0,0,0,0)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        transition: 'background 0.2s', fontSize: 12, color: 'transparent'
+                      }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.background = 'rgba(0,0,0,0.35)'
+                          e.currentTarget.style.color = 'white'
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.background = 'rgba(0,0,0,0)'
+                          e.currentTarget.style.color = 'transparent'
+                        }}
+                      >
+                        ✏️ Changer
+                      </div>
+                    )}
+                    <input
+                      ref={el => fileRefs.current[p.id] = el}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={e => handleImageUpload(e, p.id)}
+                    />
                   </div>
-                  <div className="projet-body">
+
+                  {/* Corps de la carte — navigation vers le projet */}
+                  <div
+                    className="projet-body"
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => navigate(`/projet/${p.id}`, { state: { projet: p } })}
+                  >
                     <div className="projet-ref">{p.reference}</div>
                     <div className="projet-nom">{p.nom}</div>
                     <span className="badge" style={{ background: badge.bg, color: badge.color }}>
