@@ -36,17 +36,31 @@ export default function Accueil() {
     setLoading(false)
   }
 
-  async function handleImageUpload(e, projetId) {
+  async function handleImageUpload(e, projet) {
     const file = e.target.files[0]
     if (!file) return
-    setUploadingId(projetId)
+    // Réinitialiser l'input pour permettre de re-sélectionner le même fichier
+    e.target.value = ''
+    setUploadingId(projet.id)
 
-    // Upload dans Supabase Storage
     const ext = file.name.split('.').pop()
-    const path = `projets/${projetId}/cover.${ext}`
+    // Nom fixe par projet — on écrase toujours le même fichier
+    const path = `projets/${projet.id}/cover.${ext}`
+
+    // Supprimer toutes les anciennes versions de cover (peu importe l'extension)
+    const { data: existingFiles } = await supabase.storage
+      .from('Photos')
+      .list(`projets/${projet.id}`)
+
+    if (existingFiles && existingFiles.length > 0) {
+      const toDelete = existingFiles.map(f => `projets/${projet.id}/${f.name}`)
+      await supabase.storage.from('Photos').remove(toDelete)
+    }
+
+    // Upload du nouveau fichier
     const { error: uploadError } = await supabase.storage
       .from('Photos')
-      .upload(path, file, { upsert: true })
+      .upload(path, file)
 
     if (uploadError) {
       console.error(uploadError)
@@ -54,15 +68,15 @@ export default function Accueil() {
       return
     }
 
-    // Récupérer l'URL publique
+    // URL publique avec cache-buster pour forcer le rechargement
     const { data: urlData } = supabase.storage.from('Photos').getPublicUrl(path)
-    const image_url = urlData.publicUrl
+    const image_url = `${urlData.publicUrl}?t=${Date.now()}`
 
     // Mettre à jour la BDD
-    await supabase.from('projets').update({ image_url }).eq('id', projetId)
+    await supabase.from('projets').update({ image_url }).eq('id', projet.id)
 
-    // Mettre à jour l'état local
-    setProjets(prev => prev.map(p => p.id === projetId ? { ...p, image_url } : p))
+    // Mettre à jour l'état local immédiatement
+    setProjets(prev => prev.map(p => p.id === projet.id ? { ...p, image_url } : p))
     setUploadingId(null)
   }
 
@@ -78,7 +92,7 @@ export default function Accueil() {
               const badge = PHASES_BADGES[p.phase] || PHASES_BADGES.EXE
               return (
                 <div key={p.id} className="card">
-                  {/* Zone image cliquable pour upload */}
+                  {/* Zone image — clic pour uploader ou remplacer */}
                   <div
                     className="projet-img"
                     style={{ position: 'relative', cursor: 'pointer' }}
@@ -89,32 +103,21 @@ export default function Accueil() {
                     title="Cliquer pour changer l'image"
                   >
                     {uploadingId === p.id ? (
-                      <div style={{ fontSize: 13, color: '#888' }}>Upload…</div>
+                      <div style={{ fontSize: 13, color: '#888' }}>⏳ Upload…</div>
                     ) : p.image_url ? (
-                      <img src={p.image_url} alt={p.nom} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <>
+                        <img
+                          src={p.image_url}
+                          alt={p.nom}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                        {/* Overlay "Changer" au survol */}
+                        <div className="img-overlay">✏️ Changer</div>
+                      </>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                         <span style={{ fontSize: 32 }}>{EMOJIS[i % EMOJIS.length]}</span>
-                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', background: 'rgba(0,0,0,0.25)', padding: '2px 8px', borderRadius: 10 }}>+ Photo</span>
-                      </div>
-                    )}
-                    {/* Overlay au survol si image déjà présente */}
-                    {p.image_url && (
-                      <div style={{
-                        position: 'absolute', inset: 0, background: 'rgba(0,0,0,0)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'background 0.2s', fontSize: 12, color: 'transparent'
-                      }}
-                        onMouseEnter={e => {
-                          e.currentTarget.style.background = 'rgba(0,0,0,0.35)'
-                          e.currentTarget.style.color = 'white'
-                        }}
-                        onMouseLeave={e => {
-                          e.currentTarget.style.background = 'rgba(0,0,0,0)'
-                          e.currentTarget.style.color = 'transparent'
-                        }}
-                      >
-                        ✏️ Changer
+                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)', background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: 10 }}>+ Photo</span>
                       </div>
                     )}
                     <input
@@ -122,11 +125,11 @@ export default function Accueil() {
                       type="file"
                       accept="image/*"
                       style={{ display: 'none' }}
-                      onChange={e => handleImageUpload(e, p.id)}
+                      onChange={e => handleImageUpload(e, p)}
                     />
                   </div>
 
-                  {/* Corps de la carte — navigation vers le projet */}
+                  {/* Corps — navigation vers le projet */}
                   <div
                     className="projet-body"
                     style={{ cursor: 'pointer' }}
