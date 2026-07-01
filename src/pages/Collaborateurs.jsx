@@ -22,6 +22,13 @@ export default function Collaborateurs() {
 
   useEffect(() => { charger() }, [id])
 
+  // Ouvre le modal contact dès que l'entreprise est sélectionnée
+  useEffect(() => {
+    if (modal === 'contact-apres-entreprise' && entrepriseSelectee) {
+      setModal('contact')
+    }
+  }, [modal, entrepriseSelectee])
+
   async function charger() {
     setLoading(true)
     const { data: affectations } = await supabase
@@ -105,11 +112,10 @@ export default function Collaborateurs() {
   }
 
   async function ajouterEntreprise(entreprise) {
-    // Entreprise créée — on propose d'ajouter un premier contact
-    setModal(null)
-    await charger()
+    // On stocke l'entreprise et on passe en mode "ajout contact"
+    // Le useEffect ci-dessous détecte le changement et ouvre le bon modal
     setEntrepriseSelectee(entreprise)
-    setTimeout(() => setModal('contact'), 200)
+    setModal('contact-apres-entreprise')
   }
 
   function toggleEntr(eid) {
