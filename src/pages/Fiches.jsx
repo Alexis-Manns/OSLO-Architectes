@@ -76,7 +76,9 @@ export function FicheCollaborateur() {
 
     setModifie(now)
     setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
+    setTimeout(() => {
+      navigate(`/projet/${id}/collaborateurs`, { state: { projet } })
+    }, 800)
     setSaving(false)
   }
 
@@ -208,7 +210,9 @@ export function FicheContact() {
     if (error) { setErreur('Erreur : ' + error.message); setSaving(false); return }
     setModifie(now)
     setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
+    setTimeout(() => {
+      navigate(`/projet/${id}/collaborateurs`, { state: { projet } })
+    }, 800)
     setSaving(false)
   }
 
@@ -284,7 +288,9 @@ export function FicheGuide() {
       updated_at: new Date().toISOString(),
     }).eq('id', gid)
     setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
+    setTimeout(() => {
+      navigate(`/projet/${id}/guides`, { state: { projet } })
+    }, 800)
     setSaving(false)
   }
 
