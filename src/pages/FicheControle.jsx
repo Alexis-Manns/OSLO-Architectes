@@ -15,7 +15,6 @@ export default function FicheControle() {
   const projet = location.state?.projet || { nom: 'Projet', phase: 'EXE', reference: '' }
   const isNouveau = !cid || cid === 'nouveau' || cid === 'undefined'
   const fileRef = useRef()
-  // ID temporaire stable pour l'upload photos avant sauvegarde
   const tempId = useRef(`tmp_${Date.now()}`)
 
   const [form, setForm] = useState({
@@ -60,12 +59,10 @@ export default function FicheControle() {
   async function enregistrer() {
     setSaving(true)
     setErreur(null)
-    console.log('DEBUG - cid:', cid, '| isNouveau:', isNouveau, '| id projet:', id)
     const now = new Date().toISOString()
 
     if (isNouveau) {
-      // Créer le contrôle — Supabase génère l'UUID
-      const { data, error } = await supabase.from('controles').insert({
+      const { error } = await supabase.from('controles').insert({
         projet_id:           id,
         designation:         form.designation,
         realise_par:         form.realise_par,
@@ -77,8 +74,7 @@ export default function FicheControle() {
         photos:              photos,
         created_at:          now,
         updated_at:          now,
-      }).select().single()
-
+      })
       if (error) { setErreur('Erreur : ' + error.message); setSaving(false); return }
     } else {
       const { error } = await supabase.from('controles').update({
@@ -92,12 +88,24 @@ export default function FicheControle() {
         photos:              photos,
         updated_at:          now,
       }).eq('id', cid)
-
       if (error) { setErreur('Erreur : ' + error.message); setSaving(false); return }
     }
 
     setSaving(false)
-    navigate(`/projet/${id}/controles`, { state: { projet } })
+    return true
+  }
+
+  async function handleEnregistrer() {
+    const ok = await enregistrer()
+    if (ok) navigate(`/projet/${id}/controles`, { state: { projet } })
+  }
+
+  async function handleImprimerEtEnregistrer() {
+    const ok = await enregistrer()
+    if (ok) {
+      imprimer()
+      navigate(`/projet/${id}/controles`, { state: { projet } })
+    }
   }
 
   async function handlePhotos(e) {
@@ -105,9 +113,8 @@ export default function FicheControle() {
     if (!files.length) return
     e.target.value = ''
     setUploading(true)
-    const nouvellesUrls = []
-    // Utiliser l'ID réel si existant, sinon un ID temporaire stable
     const dossier = isNouveau ? tempId.current : cid
+    const nouvellesUrls = []
     for (const file of files) {
       const ext = file.name.split('.').pop()
       const path = `controles/${id}/${dossier}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
@@ -132,90 +139,71 @@ export default function FicheControle() {
       'Non conforme':  { bg: '#FCEBEB', color: '#A32D2D' },
     }
     const br = BADGE_RESULTAT[form.resultat] || { bg: '#eee', color: '#333' }
-
     const photosHtml = photos.length > 0 ? `
       <div class="section">Photos (${photos.length})</div>
-      <div class="photos-grid">
-        ${photos.map(url => `<img src="${url}" class="photo" />`).join('')}
-      </div>
+      <div class="photos-grid">${photos.map(url => `<img src="${url}" class="photo" />`).join('')}</div>
     ` : ''
 
     const html = `<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8">
-  <title>Contrôle Qualité — ${form.designation}</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; font-size: 12px; color: #1a1a1a; padding: 32px; }
-    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #FF8C00; padding-bottom: 12px; margin-bottom: 20px; }
-    .logo { font-size: 18px; font-weight: 700; color: #FF8C00; }
-    .titre { font-size: 18px; font-weight: 700; margin-bottom: 3px; }
-    .meta { font-size: 11px; color: #888; }
-    .badge { display: inline-block; font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 500; background: ${br.bg}; color: ${br.color}; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
-    .field { margin-bottom: 10px; }
-    .label { font-size: 10px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
-    .value { font-size: 12px; padding: 6px 10px; background: #f8f8f8; border-radius: 4px; }
-    .section { font-size: 10px; font-weight: 700; color: #FF8C00; text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 8px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
-    .comment { font-size: 12px; color: #444; padding: 10px; background: #f8f8f8; border-radius: 4px; line-height: 1.6; }
-    .photos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-    .photo { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 4px; }
-    .footer { margin-top: 24px; padding-top: 10px; border-top: 1px solid #eee; font-size: 10px; color: #aaa; }
-    @media print {
-      body { padding: 16px; }
-      @page {
-        margin: 10mm;
-        /* Supprime l'en-tête et pied de page du navigateur */
-        size: A4;
-      }
-    }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div>
-      <div class="logo">Oslo Architectes</div>
-      <div class="titre">${form.designation || '—'}</div>
-      <div class="meta">${projet.nom}${projet.reference ? ' · ' + projet.reference : ''} · Phase ${projet.phase}</div>
-    </div>
-    <div style="text-align:right">
-      <div style="font-size:10px;color:#aaa;margin-bottom:4px">Résultat</div>
-      <span class="badge">${form.resultat}</span>
-    </div>
+<html lang="fr"><head><meta charset="UTF-8">
+<title>Contrôle Qualité — ${form.designation}</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, sans-serif; font-size: 12px; color: #1a1a1a; padding: 32px; }
+.header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #FF8C00; padding-bottom: 12px; margin-bottom: 20px; }
+.logo { font-size: 18px; font-weight: 700; color: #FF8C00; }
+.titre { font-size: 18px; font-weight: 700; margin-bottom: 3px; }
+.meta { font-size: 11px; color: #888; }
+.badge { display: inline-block; font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 500; background: ${br.bg}; color: ${br.color}; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.field { margin-bottom: 10px; }
+.label { font-size: 10px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+.value { font-size: 12px; padding: 6px 10px; background: #f8f8f8; border-radius: 4px; }
+.section { font-size: 10px; font-weight: 700; color: #FF8C00; text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 8px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+.comment { font-size: 12px; color: #444; padding: 10px; background: #f8f8f8; border-radius: 4px; line-height: 1.6; }
+.photos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.photo { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 4px; }
+.footer { margin-top: 24px; padding-top: 10px; border-top: 1px solid #eee; font-size: 10px; color: #aaa; }
+@media print { body { padding: 16px; } @page { margin: 10mm; size: A4; } }
+</style></head><body>
+<div class="header">
+  <div>
+    <div class="logo">Oslo Architectes</div>
+    <div class="titre">${form.designation || '—'}</div>
+    <div class="meta">${projet.nom}${projet.reference ? ' · ' + projet.reference : ''} · Phase ${projet.phase}</div>
   </div>
-  <div class="grid">
-    <div>
-      <div class="field"><div class="label">Réalisé par</div><div class="value">${form.realise_par}</div></div>
-      <div class="field"><div class="label">Type de contrôle</div><div class="value">${form.type_controle}</div></div>
-    </div>
-    <div>
-      <div class="field"><div class="label">Date</div><div class="value">${form.date_controle ? dateFR(form.date_controle) : '—'}</div></div>
-      ${form.type_controle === 'Échantillonnage' && form.logements_controles ? `<div class="field"><div class="label">Logements contrôlés</div><div class="value">${form.logements_controles}</div></div>` : ''}
-    </div>
+  <div style="text-align:right">
+    <div style="font-size:10px;color:#aaa;margin-bottom:4px">Résultat</div>
+    <span class="badge">${form.resultat}</span>
   </div>
-  ${form.commentaire ? `<div class="section">Commentaire</div><div class="comment">${form.commentaire}</div>` : ''}
-  ${photosHtml}
-  <div class="footer">Généré le ${new Date().toLocaleDateString('fr-FR')}</div>
-  <script>
-    window.onload = function() {
-      setTimeout(function() { window.print(); }, 800);
-    };
-  <\/script>
-</body>
-</html>`
+</div>
+<div class="grid">
+  <div>
+    <div class="field"><div class="label">Réalisé par</div><div class="value">${form.realise_par}</div></div>
+    <div class="field"><div class="label">Type de contrôle</div><div class="value">${form.type_controle}</div></div>
+  </div>
+  <div>
+    <div class="field"><div class="label">Date</div><div class="value">${form.date_controle ? dateFR(form.date_controle) : '—'}</div></div>
+    ${form.type_controle === 'Échantillonnage' && form.logements_controles ? `<div class="field"><div class="label">Logements contrôlés</div><div class="value">${form.logements_controles}</div></div>` : ''}
+  </div>
+</div>
+${form.commentaire ? `<div class="section">Commentaire</div><div class="comment">${form.commentaire}</div>` : ''}
+${photosHtml}
+<div class="footer">Généré le ${new Date().toLocaleDateString('fr-FR')}</div>
+<script>window.onload = function() { setTimeout(function() { window.print(); }, 800); };<\/script>
+</body></html>`
 
     const w = window.open('', '_blank')
     w.document.write(html)
     w.document.close()
   }
 
-  const BADGE_RESULTAT_COLORS = {
+  const BADGE_COLORS = {
     'Conforme':      { bg: '#EAF3DE', color: '#3B6D11' },
     'Sous réserves': { bg: '#FAEEDA', color: '#854F0B' },
     'Non conforme':  { bg: '#FCEBEB', color: '#A32D2D' },
   }
-  const bc = BADGE_RESULTAT_COLORS[form.resultat] || {}
+  const bc = BADGE_COLORS[form.resultat] || {}
 
   return (
     <div className="page">
@@ -229,12 +217,11 @@ export default function FicheControle() {
         phase={projet.phase}
       />
       <div className="content">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {modifie && <div className="modif-bar" style={{ margin: 0 }}>● Modifié le {dateFR(modifie)}</div>}
-            {form.resultat && <span className="badge" style={{ background: bc.bg, color: bc.color }}>{form.resultat}</span>}
-          </div>
 
+        {/* Barre statut */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          {modifie && <div className="modif-bar" style={{ margin: 0 }}>● Modifié le {dateFR(modifie)}</div>}
+          {form.resultat && <span className="badge" style={{ background: bc.bg, color: bc.color }}>{form.resultat}</span>}
         </div>
 
         {erreur && (
@@ -311,18 +298,21 @@ export default function FicheControle() {
           )}
         </div>
 
-        <div className="btn-row" style={{ flexWrap: 'wrap' }}>
-          <button className="btn-save" onClick={enregistrer} disabled={saving}>
+        {/* 3 boutons */}
+        <div className="btn-row" style={{ flexWrap: 'wrap', gap: 10 }}>
+          <button className="btn-save" onClick={handleEnregistrer} disabled={saving}>
             {saving ? 'Enregistrement…' : 'Enregistrer'}
           </button>
           <button
-            onClick={async () => { await enregistrer(); imprimer() }}
+            onClick={handleImprimerEtEnregistrer}
             disabled={saving}
             style={{
               background: '#FF8C00', color: 'white', border: 'none',
               padding: '9px 18px', borderRadius: 6, fontSize: 13,
-              cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500,
-              display: 'flex', alignItems: 'center', gap: 6, opacity: saving ? 0.6 : 1
+              cursor: saving ? 'not-allowed' : 'pointer',
+              fontFamily: 'inherit', fontWeight: 500,
+              display: 'flex', alignItems: 'center', gap: 6,
+              opacity: saving ? 0.6 : 1
             }}
           >
             🖨️ Imprimer PDF &amp; Enregistrer
