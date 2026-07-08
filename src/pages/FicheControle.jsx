@@ -3,8 +3,6 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
 
-const PHASES = ['APS','APD','PC','PRO','DCE','ACT','EXE','OPR','AOR']
-
 function dateFR(iso) {
   if (!iso) return ''
   return new Date(iso).toLocaleDateString('fr-FR')
@@ -17,6 +15,8 @@ export default function FicheControle() {
   const projet = location.state?.projet || { nom: 'Projet', phase: 'EXE', reference: '' }
   const isNouveau = cid === 'nouveau'
   const fileRef = useRef()
+  // ID temporaire stable pour l'upload photos avant sauvegarde
+  const tempId = useRef(`tmp_${Date.now()}`)
 
   const [form, setForm] = useState({
     designation: '',
@@ -42,13 +42,13 @@ export default function FicheControle() {
     const { data } = await supabase.from('controles').select('*').eq('id', cid).single()
     if (data) {
       setForm({
-        designation:         data.designation      || data.titre || '',
-        realise_par:         data.realise_par       || 'MOE',
-        resultat:            data.resultat          || 'Conforme',
-        date_controle:       data.date_controle     || '',
-        type_controle:       data.type_controle     || 'Total',
+        designation:         data.designation       || data.titre || '',
+        realise_par:         data.realise_par        || 'MOE',
+        resultat:            data.resultat           || 'Conforme',
+        date_controle:       data.date_controle      || '',
+        type_controle:       data.type_controle      || 'Total',
         logements_controles: data.logements_controles || '',
-        commentaire:         data.commentaire       || '',
+        commentaire:         data.commentaire        || '',
       })
       setPhotos(data.photos || [])
       setModifie(data.updated_at || null)
@@ -63,6 +63,7 @@ export default function FicheControle() {
     const now = new Date().toISOString()
 
     if (isNouveau) {
+      // Créer le contrôle — Supabase génère l'UUID
       const { data, error } = await supabase.from('controles').insert({
         projet_id:           id,
         designation:         form.designation,
@@ -76,6 +77,7 @@ export default function FicheControle() {
         created_at:          now,
         updated_at:          now,
       }).select().single()
+
       if (error) { setErreur('Erreur : ' + error.message); setSaving(false); return }
     } else {
       const { error } = await supabase.from('controles').update({
@@ -89,6 +91,7 @@ export default function FicheControle() {
         photos:              photos,
         updated_at:          now,
       }).eq('id', cid)
+
       if (error) { setErreur('Erreur : ' + error.message); setSaving(false); return }
     }
 
@@ -102,9 +105,11 @@ export default function FicheControle() {
     e.target.value = ''
     setUploading(true)
     const nouvellesUrls = []
+    // Utiliser l'ID réel si existant, sinon un ID temporaire stable
+    const dossier = isNouveau ? tempId.current : cid
     for (const file of files) {
       const ext = file.name.split('.').pop()
-      const path = `controles/${id}/${cid || 'nouveau'}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+      const path = `controles/${id}/${dossier}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
       const { error } = await supabase.storage.from('Photos').upload(path, file)
       if (!error) {
         const { data: urlData } = supabase.storage.from('Photos').getPublicUrl(path)
@@ -156,7 +161,14 @@ export default function FicheControle() {
     .photos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .photo { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 4px; }
     .footer { margin-top: 24px; padding-top: 10px; border-top: 1px solid #eee; font-size: 10px; color: #aaa; }
-    @media print { body { padding: 16px; } }
+    @media print {
+      body { padding: 16px; }
+      @page {
+        margin: 10mm;
+        /* Supprime l'en-tête et pied de page du navigateur */
+        size: A4;
+      }
+    }
   </style>
 </head>
 <body>
@@ -164,7 +176,7 @@ export default function FicheControle() {
     <div>
       <div class="logo">Oslo Architectes</div>
       <div class="titre">${form.designation || '—'}</div>
-      <div class="meta">${projet.nom} · ${projet.reference || ''} · Phase ${projet.phase}</div>
+      <div class="meta">${projet.nom}${projet.reference ? ' · ' + projet.reference : ''} · Phase ${projet.phase}</div>
     </div>
     <div style="text-align:right">
       <div style="font-size:10px;color:#aaa;margin-bottom:4px">Résultat</div>
@@ -184,7 +196,20 @@ export default function FicheControle() {
   ${form.commentaire ? `<div class="section">Commentaire</div><div class="comment">${form.commentaire}</div>` : ''}
   ${photosHtml}
   <div class="footer">Généré le ${new Date().toLocaleDateString('fr-FR')}</div>
-  <script>window.onload = () => { window.print(); }<\/script>
+  <div id="print-tip" style="margin-top:12px;padding:10px;background:#FFF3E0;border-radius:6px;font-size:11px;color:#854F0B">
+    💡 Dans la boîte d'impression : décochez <strong>"En-têtes et pieds de page"</strong> pour un rendu propre.
+  </div>
+  <script>
+    window.onload = function() {
+      setTimeout(function() {
+        document.getElementById('print-tip').style.display = 'none';
+        window.print();
+        setTimeout(function() {
+          document.getElementById('print-tip').style.display = 'block';
+        }, 1000);
+      }, 800);
+    };
+  <\/script>
 </body>
 </html>`
 
@@ -212,28 +237,18 @@ export default function FicheControle() {
         phase={projet.phase}
       />
       <div className="content">
-        {/* Barre infos */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {modifie && (
-              <div className="modif-bar" style={{ margin: 0 }}>● Modifié le {dateFR(modifie)}</div>
-            )}
-            {form.resultat && (
-              <span className="badge" style={{ background: bc.bg, color: bc.color }}>{form.resultat}</span>
-            )}
+            {modifie && <div className="modif-bar" style={{ margin: 0 }}>● Modifié le {dateFR(modifie)}</div>}
+            {form.resultat && <span className="badge" style={{ background: bc.bg, color: bc.color }}>{form.resultat}</span>}
           </div>
-          {/* Bouton impression */}
           {!isNouveau && (
-            <button
-              onClick={imprimer}
-              title="Imprimer en PDF"
-              style={{
-                background: 'var(--fond)', border: '1px solid var(--bordure)',
-                borderRadius: 8, padding: '8px 12px', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 6,
-                color: 'var(--texte-sec)', fontSize: 13, fontFamily: 'inherit'
-              }}
-            >
+            <button onClick={imprimer} style={{
+              background: 'var(--fond)', border: '1px solid var(--bordure)',
+              borderRadius: 8, padding: '8px 12px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6,
+              color: 'var(--texte-sec)', fontSize: 13, fontFamily: 'inherit'
+            }}>
               🖨️ Imprimer PDF
             </button>
           )}
@@ -254,16 +269,13 @@ export default function FicheControle() {
           <div className="form-group">
             <label className="form-label">Réalisé par</label>
             <select className="form-input" value={form.realise_par} onChange={e => set('realise_par', e.target.value)}>
-              <option>MOE</option>
-              <option>Entreprise</option>
+              <option>MOE</option><option>Entreprise</option>
             </select>
           </div>
           <div className="form-group">
             <label className="form-label">Résultat</label>
             <select className="form-input" value={form.resultat} onChange={e => set('resultat', e.target.value)}>
-              <option>Conforme</option>
-              <option>Sous réserves</option>
-              <option>Non conforme</option>
+              <option>Conforme</option><option>Sous réserves</option><option>Non conforme</option>
             </select>
           </div>
         </div>
@@ -276,8 +288,7 @@ export default function FicheControle() {
           <div className="form-group">
             <label className="form-label">Type de contrôle</label>
             <select className="form-input" value={form.type_controle} onChange={e => set('type_controle', e.target.value)}>
-              <option>Total</option>
-              <option>Échantillonnage</option>
+              <option>Total</option><option>Échantillonnage</option>
             </select>
           </div>
         </div>
@@ -294,35 +305,23 @@ export default function FicheControle() {
           <textarea className="form-input" value={form.commentaire} onChange={e => set('commentaire', e.target.value)} rows={4} />
         </div>
 
-        {/* Upload photos */}
         <div className="form-group">
           <label className="form-label">Photos</label>
           <div className="photo-upload" onClick={() => fileRef.current.click()}>
             {uploading ? '⏳ Upload en cours…' : '📷 Cliquer pour ajouter des photos'}
           </div>
           <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handlePhotos} />
-
           {photos.length > 0 && (
             <div className="photos-grid" style={{ marginTop: 10 }}>
               {photos.map((url, i) => (
                 <div key={i} style={{ position: 'relative' }}>
-                  <img
-                    src={url}
-                    alt=""
-                    className="photo-thumb"
-                    style={{ cursor: 'zoom-in' }}
-                    onClick={() => setPhotoAgrandie(url)}
-                  />
-                  <button
-                    onClick={() => supprimerPhoto(url)}
-                    style={{
-                      position: 'absolute', top: 4, right: 4,
-                      background: 'rgba(0,0,0,0.55)', color: 'white',
-                      border: 'none', borderRadius: '50%',
-                      width: 22, height: 22, cursor: 'pointer',
-                      fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center'
-                    }}
-                  >×</button>
+                  <img src={url} alt="" className="photo-thumb" style={{ cursor: 'zoom-in' }} onClick={() => setPhotoAgrandie(url)} />
+                  <button onClick={() => supprimerPhoto(url)} style={{
+                    position: 'absolute', top: 4, right: 4,
+                    background: 'rgba(0,0,0,0.55)', color: 'white',
+                    border: 'none', borderRadius: '50%', width: 22, height: 22,
+                    cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}>×</button>
                 </div>
               ))}
             </div>
@@ -339,30 +338,20 @@ export default function FicheControle() {
         </div>
       </div>
 
-      {/* Lightbox photo agrandie */}
+      {/* Lightbox */}
       {photoAgrandie && (
-        <div
-          onClick={() => setPhotoAgrandie(null)}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)',
-            zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: 20, cursor: 'zoom-out'
-          }}
-        >
-          <img
-            src={photoAgrandie}
-            alt=""
-            style={{ maxWidth: '100%', maxHeight: '90vh', borderRadius: 8, objectFit: 'contain' }}
-          />
-          <button
-            onClick={() => setPhotoAgrandie(null)}
-            style={{
-              position: 'fixed', top: 16, right: 16,
-              background: 'rgba(255,255,255,0.15)', border: 'none',
-              color: 'white', width: 36, height: 36, borderRadius: '50%',
-              fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}
-          >×</button>
+        <div onClick={() => setPhotoAgrandie(null)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)',
+          zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 20, cursor: 'zoom-out'
+        }}>
+          <img src={photoAgrandie} alt="" style={{ maxWidth: '100%', maxHeight: '90vh', borderRadius: 8, objectFit: 'contain' }} />
+          <button onClick={() => setPhotoAgrandie(null)} style={{
+            position: 'fixed', top: 16, right: 16,
+            background: 'rgba(255,255,255,0.15)', border: 'none',
+            color: 'white', width: 36, height: 36, borderRadius: '50%',
+            fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>×</button>
         </div>
       )}
     </div>
