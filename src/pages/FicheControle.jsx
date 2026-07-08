@@ -60,6 +60,7 @@ export default function FicheControle() {
   async function enregistrer() {
     setSaving(true)
     setErreur(null)
+    console.log('DEBUG - cid:', cid, '| isNouveau:', isNouveau, '| id projet:', id)
     const now = new Date().toISOString()
 
     if (isNouveau) {
