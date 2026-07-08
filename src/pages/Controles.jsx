@@ -19,10 +19,12 @@ function dateFR(iso) {
   return d.toLocaleDateString('fr-FR')
 }
 
-function estRecent(dateStr) {
-  if (!dateStr) return false
-  const diff = Date.now() - new Date(dateStr).getTime()
-  return diff < 7 * 24 * 60 * 60 * 1000 // 7 jours
+function estRecent(createdAt, updatedAt) {
+  if (!updatedAt) return false
+  // Pas de MAJ si created_at et updated_at sont quasi identiques (vient d'être créé)
+  if (createdAt && Math.abs(new Date(updatedAt) - new Date(createdAt)) < 10000) return false
+  const diff = Date.now() - new Date(updatedAt).getTime()
+  return diff < 7 * 24 * 60 * 60 * 1000
 }
 
 export default function Controles() {
@@ -67,7 +69,7 @@ export default function Controles() {
           controles.map(c => {
             const br = BADGE_RESULTAT[c.resultat] || {}
             const bl = BADGE_REAL[c.realise_par] || {}
-            const maj = estRecent(c.updated_at)
+            const maj = estRecent(c.created_at, c.updated_at)
             return (
               <div
                 key={c.id}
