@@ -13,7 +13,7 @@ export default function FicheControle() {
   const { id, cid } = useParams()
   const location = useLocation()
   const projet = location.state?.projet || { nom: 'Projet', phase: 'EXE', reference: '' }
-  const isNouveau = cid === 'nouveau'
+  const isNouveau = !cid || cid === 'nouveau' || cid === 'undefined'
   const fileRef = useRef()
   // ID temporaire stable pour l'upload photos avant sauvegarde
   const tempId = useRef(`tmp_${Date.now()}`)
