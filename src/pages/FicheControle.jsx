@@ -196,18 +196,9 @@ export default function FicheControle() {
   ${form.commentaire ? `<div class="section">Commentaire</div><div class="comment">${form.commentaire}</div>` : ''}
   ${photosHtml}
   <div class="footer">Généré le ${new Date().toLocaleDateString('fr-FR')}</div>
-  <div id="print-tip" style="margin-top:12px;padding:10px;background:#FFF3E0;border-radius:6px;font-size:11px;color:#854F0B">
-    💡 Dans la boîte d'impression : décochez <strong>"En-têtes et pieds de page"</strong> pour un rendu propre.
-  </div>
   <script>
     window.onload = function() {
-      setTimeout(function() {
-        document.getElementById('print-tip').style.display = 'none';
-        window.print();
-        setTimeout(function() {
-          document.getElementById('print-tip').style.display = 'block';
-        }, 1000);
-      }, 800);
+      setTimeout(function() { window.print(); }, 800);
     };
   <\/script>
 </body>
