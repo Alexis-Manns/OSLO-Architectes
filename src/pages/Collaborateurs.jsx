@@ -25,19 +25,16 @@ export default function Collaborateurs() {
   async function charger() {
     setLoading(true)
 
-    // Collaborateurs Oslo affectés au projet
     const { data: affectations } = await supabase
       .from('affectations')
       .select('*, collaborateurs(*)')
       .eq('projet_id', id)
 
-    // Entreprises affectées au projet
     const { data: affEntreprises } = await supabase
       .from('affectations_entreprises')
       .select('*, entreprises(*)')
       .eq('projet_id', id)
 
-    // Contacts affectés au projet
     const { data: affContacts } = await supabase
       .from('affectations_contacts')
       .select('*, contacts(*, entreprises(*))')
@@ -49,10 +46,8 @@ export default function Collaborateurs() {
       affectation_id: a.id
     })) || [])
 
-    // Construire la liste entreprises avec leurs contacts
     const entreprisesMap = {}
 
-    // D'abord ajouter toutes les entreprises affectées
     affEntreprises?.forEach(ae => {
       if (!ae.entreprises) return
       entreprisesMap[ae.entreprises.id] = {
@@ -62,12 +57,10 @@ export default function Collaborateurs() {
       }
     })
 
-    // Ensuite rattacher les contacts à leur entreprise
     affContacts?.forEach(ac => {
       const contact = ac.contacts
       const entreprise = contact?.entreprises
       if (!entreprise) return
-      // Si l'entreprise n'est pas encore dans la map, l'ajouter
       if (!entreprisesMap[entreprise.id]) {
         entreprisesMap[entreprise.id] = { ...entreprise, contacts: [] }
       }
@@ -83,7 +76,6 @@ export default function Collaborateurs() {
     setLoading(false)
   }
 
-  // ── Ajout ──────────────────────────────────────────────────────────────
   async function ajouterCollab(collab) {
     await supabase.from('affectations').insert({
       projet_id: id,
@@ -96,14 +88,12 @@ export default function Collaborateurs() {
   }
 
   async function ajouterEntreprise(entreprise) {
-    // Affecter l'entreprise au projet
     await supabase.from('affectations_entreprises').insert({
       projet_id: id,
       entreprise_id: entreprise.id
     })
     setModal(null)
     await charger()
-    // Déplier automatiquement l'entreprise ajoutée
     setDeplies(d => ({ ...d, [entreprise.id]: true }))
   }
 
@@ -119,7 +109,6 @@ export default function Collaborateurs() {
     charger()
   }
 
-  // ── Suppression ────────────────────────────────────────────────────────
   async function supprimerCollab(collab) {
     await supabase.from('affectations').delete().eq('id', collab.affectation_id)
     setConfirmSuppr(null)
@@ -133,11 +122,9 @@ export default function Collaborateurs() {
   }
 
   async function supprimerEntreprise(entreprise) {
-    // Supprimer l'affectation entreprise
     if (entreprise.affectation_entreprise_id) {
       await supabase.from('affectations_entreprises').delete().eq('id', entreprise.affectation_entreprise_id)
     }
-    // Supprimer toutes les affectations de contacts de cette entreprise
     const contactIds = entreprise.contacts.map(c => c.affectation_id).filter(Boolean)
     if (contactIds.length > 0) {
       await supabase.from('affectations_contacts').delete().in('id', contactIds)
@@ -149,6 +136,15 @@ export default function Collaborateurs() {
   function toggleEntr(eid) {
     setDeplies(d => ({ ...d, [eid]: !d[eid] }))
   }
+
+  const BtnSuppr = ({ onClick }) => (
+    <button
+      onClick={onClick}
+      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 18, padding: '4px 6px', borderRadius: 6, flexShrink: 0 }}
+      onMouseEnter={e => e.currentTarget.style.color = '#E24B4A'}
+      onMouseLeave={e => e.currentTarget.style.color = '#ddd'}
+    >✕</button>
+  )
 
   if (loading) return (
     <div className="page">
@@ -187,21 +183,22 @@ export default function Collaborateurs() {
             )}
             {collabs.map(c => (
               <div key={c.id} className="list-item" style={{ gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, cursor: 'pointer' }}
-                  onClick={() => navigate(`/projet/${id}/collaborateurs/${c.id}`, { state: { projet, collab: c } })}>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, cursor: 'pointer' }}
+                  onClick={() => navigate(`/projet/${id}/collaborateurs/${c.id}`, { state: { projet, collab: c } })}
+                >
                   <Avatar nom={c.nom} prenom={c.prenom} />
                   <div className="item-info">
                     <div className="item-nom">{c.prenom} {c.nom}</div>
-                    <div className="item-sub">{c.role_projet} · {c.email}</div>
+                    <div className="item-sub">
+                      {c.role_projet}
+                      {c.telephone ? ' · ' + c.telephone : ''}
+                      {c.email ? ' · ' + c.email : ''}
+                    </div>
                   </div>
                   <span className="arrow">›</span>
                 </div>
-                <button
-                  onClick={() => setConfirmSuppr({ type: 'collab', data: c, nom: `${c.prenom} ${c.nom}` })}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 18, padding: '4px 6px', borderRadius: 6, flexShrink: 0 }}
-                  onMouseEnter={e => e.currentTarget.style.color = '#E24B4A'}
-                  onMouseLeave={e => e.currentTarget.style.color = '#ddd'}
-                >✕</button>
+                <BtnSuppr onClick={() => setConfirmSuppr({ type: 'collab', data: c, nom: `${c.prenom} ${c.nom}` })} />
               </div>
             ))}
             <button className="btn-add" onClick={() => setModal('collab')}>+ Ajouter un collaborateur</button>
@@ -218,7 +215,6 @@ export default function Collaborateurs() {
             )}
             {entreprises.map(e => (
               <div key={e.id}>
-                {/* Ligne entreprise */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div className="entr-row" style={{ flex: 1 }} onClick={() => toggleEntr(e.id)}>
                     <span style={{ fontStyle: 'normal', color: 'var(--texte-sec)', marginRight: 4 }}>
@@ -227,40 +223,50 @@ export default function Collaborateurs() {
                     <Avatar nom={e.nom} prenom="" square size={36} />
                     <div className="item-info">
                       <div className="item-nom">{e.nom}</div>
-                      <div className="item-sub">{e.type} · {e.contacts.length} contact{e.contacts.length > 1 ? 's' : ''}</div>
+                      <div className="item-sub">
+                        {e.type} · {e.contacts.length} contact{e.contacts.length !== 1 ? 's' : ''}
+                      </div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setConfirmSuppr({ type: 'entreprise', data: e, nom: e.nom })}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 18, padding: '4px 6px', borderRadius: 6, flexShrink: 0 }}
-                    onMouseEnter={ev => ev.currentTarget.style.color = '#E24B4A'}
-                    onMouseLeave={ev => ev.currentTarget.style.color = '#ddd'}
-                  >✕</button>
+                  <BtnSuppr onClick={() => setConfirmSuppr({ type: 'entreprise', data: e, nom: e.nom })} />
                 </div>
 
-                {/* Contacts dépliés */}
                 {deplies[e.id] && (
                   <div className="contact-indent">
                     {e.contacts.length === 0 && (
-                      <div style={{ color: 'var(--texte-sec)', fontSize: 12, padding: '8px 0' }}>Aucun contact pour l'instant</div>
+                      <div style={{ color: 'var(--texte-sec)', fontSize: 12, padding: '8px 0' }}>
+                        Aucun contact pour l'instant
+                      </div>
                     )}
                     {e.contacts.map(c => (
                       <div key={c.id} className="list-item" style={{ gap: 8 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, cursor: 'pointer' }}
-                          onClick={() => navigate(`/projet/${id}/contacts/${c.id}`, { state: { projet, contact: c, entreprise: e } })}>
+                        <div
+                          style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, cursor: 'pointer' }}
+                          onClick={() => navigate(`/projet/${id}/contacts/${c.id}`, { state: { projet, contact: c, entreprise: e } })}
+                        >
                           <Avatar nom={c.nom} prenom={c.prenom} size={34} />
                           <div className="item-info">
-                            <div className="item-nom">{c.prenom} {c.nom}</div>
-                            <div className="item-sub">{c.fonction} · {c.telephone}</div>
+                            <div className="item-nom">
+                              {c.prenom} {c.nom}
+                              {c.interlocuteur_principal && (
+                                <span style={{
+                                  marginLeft: 7, fontSize: 10,
+                                  background: '#EAF3DE', color: '#3B6D11',
+                                  padding: '2px 7px', borderRadius: 10, fontWeight: 500
+                                }}>
+                                  Principal
+                                </span>
+                              )}
+                            </div>
+                            <div className="item-sub">
+                              {c.fonction}
+                              {c.telephone ? ' · ' + c.telephone : ''}
+                              {c.email ? ' · ' + c.email : ''}
+                            </div>
                           </div>
                           <span className="arrow">›</span>
                         </div>
-                        <button
-                          onClick={() => setConfirmSuppr({ type: 'contact', data: c, nom: `${c.prenom} ${c.nom}` })}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 18, padding: '4px 6px', borderRadius: 6, flexShrink: 0 }}
-                          onMouseEnter={ev => ev.currentTarget.style.color = '#E24B4A'}
-                          onMouseLeave={ev => ev.currentTarget.style.color = '#ddd'}
-                        >✕</button>
+                        <BtnSuppr onClick={() => setConfirmSuppr({ type: 'contact', data: c, nom: `${c.prenom} ${c.nom}` })} />
                       </div>
                     ))}
                     <button className="btn-add" style={{ marginBottom: 8 }}
@@ -284,17 +290,21 @@ export default function Collaborateurs() {
             <div style={{ color: 'var(--texte-sec)', fontSize: 13, marginBottom: 20 }}>
               Voulez-vous retirer <strong>{confirmSuppr.nom}</strong> de ce projet ?
               {confirmSuppr.type === 'entreprise' && (
-                <span style={{ display: 'block', marginTop: 6, color: '#E24B4A' }}>Tous les contacts de cette entreprise seront également retirés.</span>
+                <span style={{ display: 'block', marginTop: 6, color: '#E24B4A' }}>
+                  Tous les contacts de cette entreprise seront également retirés.
+                </span>
               )}
               <span style={{ display: 'block', marginTop: 6 }}>La fiche restera dans la base de données.</span>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button style={{ background: '#E24B4A', color: 'white', border: 'none', padding: '9px 18px', borderRadius: 6, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}
+              <button
+                style={{ background: '#E24B4A', color: 'white', border: 'none', padding: '9px 18px', borderRadius: 6, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}
                 onClick={() => {
                   if (confirmSuppr.type === 'collab') supprimerCollab(confirmSuppr.data)
                   else if (confirmSuppr.type === 'contact') supprimerContact(confirmSuppr.data)
                   else supprimerEntreprise(confirmSuppr.data)
-                }}>Retirer</button>
+                }}
+              >Retirer</button>
               <button className="btn-cancel" onClick={() => setConfirmSuppr(null)}>Annuler</button>
             </div>
           </div>
