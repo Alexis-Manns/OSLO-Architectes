@@ -234,16 +234,7 @@ export default function FicheControle() {
             {modifie && <div className="modif-bar" style={{ margin: 0 }}>● Modifié le {dateFR(modifie)}</div>}
             {form.resultat && <span className="badge" style={{ background: bc.bg, color: bc.color }}>{form.resultat}</span>}
           </div>
-          {!isNouveau && (
-            <button onClick={imprimer} style={{
-              background: 'var(--fond)', border: '1px solid var(--bordure)',
-              borderRadius: 8, padding: '8px 12px', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 6,
-              color: 'var(--texte-sec)', fontSize: 13, fontFamily: 'inherit'
-            }}>
-              🖨️ Imprimer PDF
-            </button>
-          )}
+
         </div>
 
         {erreur && (
@@ -320,9 +311,21 @@ export default function FicheControle() {
           )}
         </div>
 
-        <div className="btn-row">
+        <div className="btn-row" style={{ flexWrap: 'wrap' }}>
           <button className="btn-save" onClick={enregistrer} disabled={saving}>
             {saving ? 'Enregistrement…' : 'Enregistrer'}
+          </button>
+          <button
+            onClick={async () => { await enregistrer(); imprimer() }}
+            disabled={saving}
+            style={{
+              background: '#FF8C00', color: 'white', border: 'none',
+              padding: '9px 18px', borderRadius: 6, fontSize: 13,
+              cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500,
+              display: 'flex', alignItems: 'center', gap: 6, opacity: saving ? 0.6 : 1
+            }}
+          >
+            🖨️ Imprimer PDF &amp; Enregistrer
           </button>
           <button className="btn-cancel" onClick={() => navigate(`/projet/${id}/controles`, { state: { projet } })}>
             Annuler
