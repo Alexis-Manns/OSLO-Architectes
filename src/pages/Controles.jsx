@@ -20,10 +20,13 @@ function dateFR(iso) {
 }
 
 function estRecent(createdAt, updatedAt) {
-  if (!updatedAt) return false
-  // Pas de MAJ si created_at et updated_at sont quasi identiques (vient d'être créé)
-  if (createdAt && Math.abs(new Date(updatedAt) - new Date(createdAt)) < 10000) return false
-  const diff = Date.now() - new Date(updatedAt).getTime()
+  if (!updatedAt || !createdAt) return false
+  const created = new Date(createdAt).getTime()
+  const updated = new Date(updatedAt).getTime()
+  // Pas de MAJ si modifié moins de 30 secondes après la création
+  if (Math.abs(updated - created) < 30000) return false
+  // Pas de MAJ si la modification date de plus de 7 jours
+  const diff = Date.now() - updated
   return diff < 7 * 24 * 60 * 60 * 1000
 }
 
@@ -34,6 +37,7 @@ export default function Controles() {
   const projet = location.state?.projet || { nom: 'Projet', phase: 'EXE' }
   const [controles, setControles] = useState([])
   const [loading, setLoading] = useState(true)
+  const [confirmSuppr, setConfirmSuppr] = useState(null)
 
   useEffect(() => { charger() }, [id])
 
@@ -46,6 +50,12 @@ export default function Controles() {
       .order('created_at', { ascending: false })
     setControles(data || [])
     setLoading(false)
+  }
+
+  async function supprimer(controle) {
+    await supabase.from('controles').delete().eq('id', controle.id)
+    setConfirmSuppr(null)
+    charger()
   }
 
   return (
@@ -71,17 +81,14 @@ export default function Controles() {
             const bl = BADGE_REAL[c.realise_par] || {}
             const maj = estRecent(c.created_at, c.updated_at)
             return (
-              <div
-                key={c.id}
-                className="list-item"
-                style={{ alignItems: 'flex-start', padding: '12px', cursor: 'pointer' }}
-                onClick={() => navigate(`/projet/${id}/controles/${c.id}`, { state: { projet, controle: c } })}
-              >
-                <div className="item-info">
+              <div key={c.id} className="list-item" style={{ alignItems: 'flex-start', padding: '12px', gap: 8 }}>
+                <div
+                  style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
+                  onClick={() => navigate(`/projet/${id}/controles/${c.id}`, { state: { projet, controle: c } })}
+                >
                   <div className="item-nom">{c.designation || c.titre}</div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
                     {c.resultat && <span className="badge" style={{ background: br.bg, color: br.color }}>{c.resultat}</span>}
-                    {c.realise_par && <span className="badge" style={{ background: bl.bg, color: bl.color }}>{c.realise_par}</span>}
                     {c.type_controle && <span className="badge badge-gris">{c.type_controle}</span>}
                   </div>
                   <div className="item-sub" style={{ marginTop: 4 }}>
@@ -94,7 +101,15 @@ export default function Controles() {
                       MAJ {dateFR(c.updated_at)}
                     </span>
                   )}
-                  <span className="arrow">›</span>
+                  <span className="arrow" style={{ cursor: 'pointer' }}
+                    onClick={() => navigate(`/projet/${id}/controles/${c.id}`, { state: { projet, controle: c } })}>›</span>
+                  <button
+                    onClick={() => setConfirmSuppr(c)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 18, padding: '4px 6px', borderRadius: 6, flexShrink: 0 }}
+                    onMouseEnter={e => e.currentTarget.style.color = '#E24B4A'}
+                    onMouseLeave={e => e.currentTarget.style.color = '#ddd'}
+                    title="Supprimer ce contrôle"
+                  >✕</button>
                 </div>
               </div>
             )
@@ -107,6 +122,24 @@ export default function Controles() {
           + Nouveau contrôle
         </button>
       </div>
+
+      {confirmSuppr && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: 'var(--blanc)', borderRadius: 12, padding: 24, maxWidth: 360, width: '100%' }}>
+            <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 8 }}>Supprimer ce contrôle</div>
+            <div style={{ color: 'var(--texte-sec)', fontSize: 13, marginBottom: 20 }}>
+              Voulez-vous supprimer <strong>{confirmSuppr.designation || confirmSuppr.titre}</strong> ? Cette action est irréversible.
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                style={{ background: '#E24B4A', color: 'white', border: 'none', padding: '9px 18px', borderRadius: 6, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}
+                onClick={() => supprimer(confirmSuppr)}
+              >Supprimer</button>
+              <button className="btn-cancel" onClick={() => setConfirmSuppr(null)}>Annuler</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
