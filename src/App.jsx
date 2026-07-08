@@ -20,11 +20,13 @@ export default function App() {
       <Route path="/projet/:id/collaborateurs/:cid" element={<FicheCollaborateur />} />
       <Route path="/projet/:id/contacts/:cid" element={<FicheContact />} />
       <Route path="/projet/:id/controles" element={<Controles />} />
+      <Route path="/projet/:id/controles/nouveau" element={<FicheControle />} />
       <Route path="/projet/:id/controles/:cid" element={<FicheControle />} />
       <Route path="/projet/:id/checklists" element={<Checklists />} />
       <Route path="/projet/:id/guides" element={<Guides />} />
       <Route path="/projet/:id/guides/:gid" element={<FicheGuide />} />
       <Route path="/projet/:id/points" element={<Points />} />
+      <Route path="/projet/:id/points/nouveau" element={<FichePoint />} />
       <Route path="/projet/:id/points/:pid" element={<FichePoint />} />
     </Routes>
   )
