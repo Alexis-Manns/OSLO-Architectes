@@ -1,18 +1,28 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import Topbar from '../components/Topbar'
+import { supabase } from '../lib/supabase'
 
-const DEMO_POINTS = [
-  { id: '1', titre: 'Infiltration eau toiture — Bât. B', statut: 'Ouvert',    priorite: 'Haute',   date: '18/05/2026', auteur: 'M. Laurent', maj: true },
-  { id: '2', titre: 'Non-conformité armatures béton R+3', statut: 'En suivi', priorite: 'Moyenne', date: '10/05/2026', auteur: 'T. Dubois',  maj: false },
-  { id: '3', titre: 'Retard planning menuiseries',        statut: 'Résolu',   priorite: 'Faible',  date: '02/04/2026', auteur: 'M. Laurent', maj: false },
-]
-
-const STATUT_DOT = { 'Ouvert': 'dot-rouge', 'En suivi': 'dot-orange', 'Résolu': 'dot-vert' }
+const STATUT_DOT = { 'Ouvert': '#E24B4A', 'En suivi': '#EF9F27', 'Résolu': '#639922' }
 const STATUT_BADGE = {
-  'Ouvert':    { bg: '#FCEBEB', color: '#A32D2D' },
-  'En suivi':  { bg: '#FAEEDA', color: '#854F0B' },
-  'Résolu':    { bg: '#EAF3DE', color: '#3B6D11' },
+  'Ouvert':   { bg: '#FCEBEB', color: '#A32D2D' },
+  'En suivi': { bg: '#FAEEDA', color: '#854F0B' },
+  'Résolu':   { bg: '#EAF3DE', color: '#3B6D11' },
+}
+const PRIORITE_BADGE = {
+  'Urgente':  { bg: '#FCEBEB', color: '#A32D2D' },
+  'A suivre': { bg: '#FAEEDA', color: '#854F0B' },
+}
+
+function dateFR(iso) {
+  if (!iso) return ''
+  return new Date(iso).toLocaleDateString('fr-FR')
+}
+
+function estRecent(createdAt, updatedAt) {
+  if (!updatedAt || !createdAt) return false
+  if (Math.abs(new Date(updatedAt) - new Date(createdAt)) < 30000) return false
+  return Date.now() - new Date(updatedAt).getTime() < 7 * 24 * 60 * 60 * 1000
 }
 
 export default function Points() {
@@ -20,6 +30,21 @@ export default function Points() {
   const { id } = useParams()
   const location = useLocation()
   const projet = location.state?.projet || { nom: 'Projet', phase: 'EXE' }
+  const [points, setPoints] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => { charger() }, [id])
+
+  async function charger() {
+    setLoading(true)
+    const { data } = await supabase
+      .from('points_critiques')
+      .select('*')
+      .eq('projet_id', id)
+      .order('created_at', { ascending: false })
+    setPoints(data || [])
+    setLoading(false)
+  }
 
   return (
     <div className="page">
@@ -32,28 +57,40 @@ export default function Points() {
         phase={projet.phase}
       />
       <div className="content">
-        {DEMO_POINTS.map(p => {
-          const bs = STATUT_BADGE[p.statut] || {}
-          return (
-            <div key={p.id} className="list-item" style={{ alignItems: 'flex-start', padding: '12px' }}
-              onClick={() => navigate(`/projet/${id}/points/${p.id}`, { state: { projet, point: p } })}>
-              <div className={`statut-dot ${STATUT_DOT[p.statut]}`} style={{ marginTop: 4 }} />
-              <div className="item-info">
-                <div className="item-nom">{p.titre}</div>
-                <div className="item-sub">Signalé le {p.date} · {p.auteur}</div>
-                <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  <span className="badge" style={{ background: bs.bg, color: bs.color }}>{p.statut}</span>
-                  {p.priorite === 'Haute' && <span className="badge badge-rouge">Haute priorité</span>}
+        {loading ? <div className="loading">Chargement…</div>
+          : points.length === 0 ? (
+            <div style={{ color: 'var(--texte-sec)', fontSize: 13, padding: '30px 0', textAlign: 'center' }}>
+              Aucun point critique pour ce projet
+            </div>
+          ) : points.map(p => {
+            const bs = STATUT_BADGE[p.statut] || {}
+            const bp = PRIORITE_BADGE[p.priorite] || {}
+            const maj = estRecent(p.created_at, p.updated_at)
+            return (
+              <div key={p.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px', cursor: 'pointer', borderRadius: 8 }}
+                className="list-item"
+                onClick={() => navigate(`/projet/${id}/points/${p.id}`, { state: { projet, point: p } })}>
+                <div style={{ width: 10, height: 10, borderRadius: '50%', background: STATUT_DOT[p.statut] || '#ccc', flexShrink: 0, marginTop: 4 }} />
+                <div className="item-info">
+                  <div className="item-nom">{p.designation || p.titre}</div>
+                  <div className="item-sub">Signalé le {dateFR(p.date_signalement)} · {p.signale_par}</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                    {p.statut && <span className="badge" style={{ background: bs.bg, color: bs.color }}>{p.statut}</span>}
+                    {p.priorite && <span className="badge" style={{ background: bp.bg, color: bp.color }}>{p.priorite}</span>}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                  {maj && <span className="badge badge-orange" style={{ fontSize: 10 }}>MAJ {dateFR(p.updated_at)}</span>}
+                  <span className="arrow">›</span>
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {p.maj && <span className="badge badge-orange" style={{ fontSize: 10 }}>MAJ</span>}
-                <span className="arrow">›</span>
-              </div>
-            </div>
-          )
-        })}
-        <button className="btn-add">+ Nouveau point critique</button>
+            )
+          })
+        }
+        <button className="btn-add"
+          onClick={() => navigate(`/projet/${id}/points/nouveau`, { state: { projet } })}>
+          + Nouveau point critique
+        </button>
       </div>
     </div>
   )
