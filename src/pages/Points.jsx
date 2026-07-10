@@ -32,6 +32,7 @@ export default function Points() {
   const projet = location.state?.projet || { nom: 'Projet', phase: 'EXE' }
   const [points, setPoints] = useState([])
   const [loading, setLoading] = useState(true)
+  const [confirmSuppr, setConfirmSuppr] = useState(null)
 
   useEffect(() => { charger() }, [id])
 
@@ -44,6 +45,12 @@ export default function Points() {
       .order('created_at', { ascending: false })
     setPoints(data || [])
     setLoading(false)
+  }
+
+  async function supprimer(point) {
+    await supabase.from('points_critiques').delete().eq('id', point.id)
+    setConfirmSuppr(null)
+    charger()
   }
 
   return (
@@ -67,21 +74,28 @@ export default function Points() {
             const bp = PRIORITE_BADGE[p.priorite] || {}
             const maj = estRecent(p.created_at, p.updated_at)
             return (
-              <div key={p.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px', cursor: 'pointer', borderRadius: 8 }}
-                className="list-item"
-                onClick={() => navigate(`/projet/${id}/points/${p.id}`, { state: { projet, point: p } })}>
-                <div style={{ width: 10, height: 10, borderRadius: '50%', background: STATUT_DOT[p.statut] || '#ccc', flexShrink: 0, marginTop: 4 }} />
-                <div className="item-info">
-                  <div className="item-nom">{p.designation || p.titre}</div>
-                  <div className="item-sub">Signalé le {dateFR(p.date_signalement)} · {p.signale_par}</div>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-                    {p.statut && <span className="badge" style={{ background: bs.bg, color: bs.color }}>{p.statut}</span>}
-                    {p.priorite && <span className="badge" style={{ background: bp.bg, color: bp.color }}>{p.priorite}</span>}
+              <div key={p.id} className="list-item" style={{ alignItems: 'flex-start', padding: '12px', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: 1, minWidth: 0, cursor: 'pointer' }}
+                  onClick={() => navigate(`/projet/${id}/points/${p.id}`, { state: { projet, point: p } })}>
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: STATUT_DOT[p.statut] || '#ccc', flexShrink: 0, marginTop: 4 }} />
+                  <div className="item-info">
+                    <div className="item-nom">{p.designation || p.titre}</div>
+                    <div className="item-sub">Signalé le {dateFR(p.date_signalement)} · {p.signale_par}</div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                      {p.statut && <span className="badge" style={{ background: bs.bg, color: bs.color }}>{p.statut}</span>}
+                      {p.statut !== 'Résolu' && p.priorite && <span className="badge" style={{ background: bp.bg, color: bp.color }}>{p.priorite}</span>}
+                    </div>
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                   {maj && <span className="badge badge-orange" style={{ fontSize: 10 }}>MAJ {dateFR(p.updated_at)}</span>}
-                  <span className="arrow">›</span>
+                  <span className="arrow" style={{ cursor: 'pointer' }} onClick={() => navigate(`/projet/${id}/points/${p.id}`, { state: { projet, point: p } })}>›</span>
+                  <button
+                    onClick={() => setConfirmSuppr(p)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 18, padding: '4px 6px', borderRadius: 6 }}
+                    onMouseEnter={e => e.currentTarget.style.color = '#E24B4A'}
+                    onMouseLeave={e => e.currentTarget.style.color = '#ddd'}
+                  >✕</button>
                 </div>
               </div>
             )
@@ -92,6 +106,23 @@ export default function Points() {
           + Nouveau point critique
         </button>
       </div>
+
+      {confirmSuppr && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: 'var(--blanc)', borderRadius: 12, padding: 24, maxWidth: 380, width: '100%' }}>
+            <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 8 }}>Supprimer ce point critique</div>
+            <div style={{ color: 'var(--texte-sec)', fontSize: 13, marginBottom: 20, lineHeight: 1.5 }}>
+              Voulez-vous supprimer <strong>"{confirmSuppr.designation || confirmSuppr.titre}"</strong> ?
+              <span style={{ display: 'block', marginTop: 6, color: '#E24B4A' }}>Cette action est irréversible.</span>
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button style={{ background: '#E24B4A', color: 'white', border: 'none', padding: '9px 18px', borderRadius: 6, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}
+                onClick={() => supprimer(confirmSuppr)}>Supprimer</button>
+              <button className="btn-cancel" onClick={() => setConfirmSuppr(null)}>Annuler</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
