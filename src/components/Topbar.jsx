@@ -82,6 +82,14 @@ export default function Topbar({ breadcrumb, phase, onPhaseChange, profil, onDec
                     Administration
                   </button>
                 )}
+                {isAssocie && (
+                  <button
+                    onClick={() => { setMenuProfil(false); navigate('/feedback') }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--texte)', fontFamily: 'inherit', borderBottom: '1px solid var(--bordure)' }}
+                  >
+                    Retours utilisateurs
+                  </button>
+                )}
                 <button
                   onClick={() => { setMenuProfil(false); onDeconnexion?.() }}
                   style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#E24B4A', fontFamily: 'inherit' }}
