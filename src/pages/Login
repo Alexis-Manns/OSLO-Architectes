@@ -51,8 +51,9 @@ export default function Login() {
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{
             width: 56, height: 56, background: '#FF8C00', borderRadius: 14,
-            margin: '0 auto 14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26,
-          }}>🏛️</div>
+            margin: '0 auto 14px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 18, fontWeight: 700, color: 'white', letterSpacing: '-0.5px'
+          }}>OA</div>
           <div style={{ fontSize: 20, fontWeight: 700 }}>Oslo Architectes</div>
           <div style={{ fontSize: 13, color: 'var(--texte-sec)', marginTop: 4 }}>Gestion de projets</div>
         </div>
