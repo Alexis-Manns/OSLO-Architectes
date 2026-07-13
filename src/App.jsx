@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Login from './pages/Login'
 import Admin from './pages/Admin'
+import Feedback from './pages/Feedback'
 import Accueil from './pages/Accueil'
 import EcranProjet from './pages/EcranProjet'
 import Collaborateurs from './pages/Collaborateurs'
@@ -13,8 +14,8 @@ import Guides from './pages/Guides'
 import Points from './pages/Points'
 import FichePoint from './pages/FichePoint'
 import { FicheCollaborateur, FicheContact, FicheGuide } from './pages/Fiches'
+import BoutonFeedback from './components/BoutonFeedback'
 
-// Écran compte inactif
 function CompteInactif() {
   const { deconnexion, profil } = useAuth()
   return (
@@ -23,7 +24,7 @@ function CompteInactif() {
         <div style={{ fontSize: 40, marginBottom: 14 }}>⏳</div>
         <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Compte en attente de validation</div>
         <div style={{ fontSize: 13, color: 'var(--texte-sec)', lineHeight: 1.6, marginBottom: 20 }}>
-          Bonjour {profil?.prenom || ''} ! Votre compte doit être activé par un administrateur avant que vous puissiez accéder à l'application.
+          Bonjour {profil?.prenom || ''} ! Votre compte doit être activé par un administrateur avant de pouvoir accéder à l'application.
         </div>
         <button className="btn-cancel" onClick={deconnexion} style={{ width: '100%' }}>Se déconnecter</button>
       </div>
@@ -36,7 +37,7 @@ function RoutesProtegees() {
 
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888', fontSize: 14 }}>
-      Chargement…
+      Chargement...
     </div>
   )
 
@@ -44,24 +45,28 @@ function RoutesProtegees() {
   if (!compteActif) return <CompteInactif />
 
   return (
-    <Routes>
-      <Route path="/" element={<Accueil />} />
-      {isAssocie && <Route path="/admin" element={<Admin />} />}
-      <Route path="/projet/:id" element={<EcranProjet />} />
-      <Route path="/projet/:id/collaborateurs" element={<Collaborateurs />} />
-      <Route path="/projet/:id/collaborateurs/:cid" element={<FicheCollaborateur />} />
-      <Route path="/projet/:id/contacts/:cid" element={<FicheContact />} />
-      <Route path="/projet/:id/controles" element={<Controles />} />
-      <Route path="/projet/:id/controles/nouveau" element={<FicheControle />} />
-      <Route path="/projet/:id/controles/:cid" element={<FicheControle />} />
-      <Route path="/projet/:id/checklists" element={<Checklists />} />
-      <Route path="/projet/:id/guides" element={<Guides />} />
-      <Route path="/projet/:id/guides/:gid" element={<FicheGuide />} />
-      <Route path="/projet/:id/points" element={<Points />} />
-      <Route path="/projet/:id/points/nouveau" element={<FichePoint />} />
-      <Route path="/projet/:id/points/:pid" element={<FichePoint />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/" element={<Accueil />} />
+        {isAssocie && <Route path="/admin" element={<Admin />} />}
+        {isAssocie && <Route path="/feedback" element={<Feedback />} />}
+        <Route path="/projet/:id" element={<EcranProjet />} />
+        <Route path="/projet/:id/collaborateurs" element={<Collaborateurs />} />
+        <Route path="/projet/:id/collaborateurs/:cid" element={<FicheCollaborateur />} />
+        <Route path="/projet/:id/contacts/:cid" element={<FicheContact />} />
+        <Route path="/projet/:id/controles" element={<Controles />} />
+        <Route path="/projet/:id/controles/nouveau" element={<FicheControle />} />
+        <Route path="/projet/:id/controles/:cid" element={<FicheControle />} />
+        <Route path="/projet/:id/checklists" element={<Checklists />} />
+        <Route path="/projet/:id/guides" element={<Guides />} />
+        <Route path="/projet/:id/guides/:gid" element={<FicheGuide />} />
+        <Route path="/projet/:id/points" element={<Points />} />
+        <Route path="/projet/:id/points/nouveau" element={<FichePoint />} />
+        <Route path="/projet/:id/points/:pid" element={<FichePoint />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <BoutonFeedback />
+    </>
   )
 }
 
