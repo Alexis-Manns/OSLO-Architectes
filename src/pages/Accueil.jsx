@@ -81,8 +81,13 @@ export default function Accueil() {
 
   async function archiverProjet(projetId) {
     await supabase.from('projets').update({ archive: true }).eq('id', projetId)
-    // Retirer de mes_projets pour tous
     await supabase.from('mes_projets').delete().eq('projet_id', projetId)
+    setMenuOuvert(null)
+    charger()
+  }
+
+  async function desarchiverProjet(projetId) {
+    await supabase.from('projets').update({ archive: false }).eq('id', projetId)
     setMenuOuvert(null)
     charger()
   }
