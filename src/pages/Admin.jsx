@@ -66,7 +66,7 @@ export default function Admin() {
             {enAttente.length > 0 && (
               <>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#854F0B', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  ⏳ En attente de validation
+                  En attente de validation
                   <span className="badge badge-ambre">{enAttente.length}</span>
                 </div>
                 {enAttente.map(u => (
@@ -80,7 +80,7 @@ export default function Admin() {
                       onClick={() => activer(u)}
                       style={{ background: '#3B6D11', color: 'white', border: 'none', padding: '7px 16px', borderRadius: 6, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}
                     >
-                      ✓ Activer
+                      Activer
                     </button>
                   </div>
                 ))}
