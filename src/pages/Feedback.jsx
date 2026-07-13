@@ -28,6 +28,11 @@ export default function Feedback() {
   const [loading, setLoading] = useState(true)
   const [filtreType, setFiltreType] = useState('Tous')
   const [filtreStatut, setFiltreStatut] = useState('Tous')
+  const [developpé, setDeveloppé] = useState({})
+
+  function toggleCard(id) {
+    setDeveloppé(prev => ({ ...prev, [id]: !prev[id] }))
+  }
 
   useEffect(() => { charger() }, [])
 
@@ -120,7 +125,8 @@ export default function Feedback() {
                 background: 'var(--blanc)', border: '1px solid var(--bordure)',
                 borderRadius: 10, padding: 14, marginBottom: 10,
               }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10, cursor: 'pointer' }}
+                  onClick={() => toggleCard(f.id)}>
                   <Avatar nom={f.auteur?.nom || '?'} prenom={f.auteur?.prenom || ''} size={34} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -130,10 +136,20 @@ export default function Feedback() {
                       <span style={{ fontSize: 11, color: 'var(--texte-sec)' }}>{dateFR(f.created_at)}</span>
                       <span className="badge" style={{ background: tc.bg, color: tc.color, fontSize: 11 }}>{f.type}</span>
                       <span className="badge" style={{ background: sc.bg, color: sc.color, fontSize: 11 }}>{f.statut}</span>
+                      <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--texte-sec)' }}>
+                        {developpé[f.id] ? '▲ Réduire' : '▼ Voir tout'}
+                      </span>
                     </div>
                     <div style={{ fontSize: 13, fontWeight: 500, marginTop: 6 }}>{f.titre}</div>
                     {f.description && (
-                      <div style={{ fontSize: 12, color: 'var(--texte-sec)', marginTop: 4, lineHeight: 1.6 }}>
+                      <div style={{
+                        fontSize: 12, color: 'var(--texte-sec)', marginTop: 4, lineHeight: 1.6,
+                        overflow: developpé[f.id] ? 'visible' : 'hidden',
+                        display: developpé[f.id] ? 'block' : '-webkit-box',
+                        WebkitLineClamp: developpé[f.id] ? 'unset' : 3,
+                        WebkitBoxOrient: 'vertical',
+                        wordBreak: 'break-word',
+                      }}>
                         {f.description}
                       </div>
                     )}
