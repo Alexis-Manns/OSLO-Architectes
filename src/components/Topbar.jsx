@@ -79,14 +79,14 @@ export default function Topbar({ breadcrumb, phase, onPhaseChange, profil, onDec
                     onClick={() => { setMenuProfil(false); navigate('/admin') }}
                     style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--texte)', fontFamily: 'inherit', borderBottom: '1px solid var(--bordure)' }}
                   >
-                    ⚙️ Administration
+                    Administration
                   </button>
                 )}
                 <button
                   onClick={() => { setMenuProfil(false); onDeconnexion?.() }}
                   style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#E24B4A', fontFamily: 'inherit' }}
                 >
-                  🚪 Se déconnecter
+                  Se déconnecter
                 </button>
               </div>
             )}
