@@ -102,7 +102,7 @@ export default function Login() {
                 <label className="form-label">Email professionnel</label>
                 <input className="form-input" type="email" value={email}
                   onChange={e => setEmail(e.target.value)}
-                  placeholder="prenom.nom@oslo-architectes.fr" required autoFocus />
+                  placeholder="email" required autoFocus />
               </div>
               <div className="form-group">
                 <label className="form-label">Mot de passe {mode === 'inscription' && '(8 caractères min.)'}</label>
