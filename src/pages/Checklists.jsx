@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../context/AuthContext'
 
 const PHASES_ORDRE = [
   'Démarrage chantier',
@@ -239,14 +240,14 @@ export default function Checklists() {
   const location = useLocation()
   const projet = location.state?.projet || { nom: 'Projet', phase: 'EXE' }
 
+  const { profil } = useAuth()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [phaseActive, setPhaseActive] = useState('Démarrage chantier')
   const [modalAjout, setModalAjout] = useState(false)
-  const [modalCocher, setModalCocher] = useState(null) // item à cocher
+  const [modalCocher, setModalCocher] = useState(null)
   const [confirmSuppr, setConfirmSuppr] = useState(null)
   const [nouveauItem, setNouveauItem] = useState({ phase: 'Démarrage chantier', description: '' })
-  const [validePar, setValidePar] = useState('')
   const [observation, setObservation] = useState('')
 
   useEffect(() => { charger() }, [id])
@@ -309,12 +310,15 @@ export default function Checklists() {
 
   async function confirmerCochage() {
     const now = new Date().toISOString()
+    const nomUtilisateur = profil
+      ? `${profil.prenom || ''} ${profil.nom || ''}`.trim() || profil.email
+      : 'Utilisateur'
     const { data } = await supabase
       .from('checklist_items')
       .update({
         coche: true,
         coche_le: now,
-        valide_par: validePar || 'Non renseigné',
+        valide_par: nomUtilisateur,
         observation: observation || null,
       })
       .eq('id', modalCocher.id)
@@ -322,6 +326,7 @@ export default function Checklists() {
       .single()
     setItems(prev => prev.map(i => i.id === modalCocher.id ? data : i))
     setModalCocher(null)
+    setObservation('')
   }
 
   async function ajouterItem() {
@@ -472,18 +477,17 @@ export default function Checklists() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div style={{ background: 'var(--blanc)', borderRadius: 12, padding: 24, maxWidth: 420, width: '100%' }}>
             <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 6 }}>Valider cet item</div>
-            <div style={{ fontSize: 13, color: 'var(--texte-sec)', marginBottom: 16, lineHeight: 1.5 }}>{modalCocher.description}</div>
-            <div className="form-group">
-              <label className="form-label">Validé par *</label>
-              <input className="form-input" value={validePar} onChange={e => setValidePar(e.target.value)} placeholder="Votre nom ou initiales" autoFocus />
+            <div style={{ fontSize: 13, color: 'var(--texte-sec)', marginBottom: 4, lineHeight: 1.5 }}>{modalCocher.description}</div>
+            <div style={{ fontSize: 12, color: 'var(--orange)', marginBottom: 16, fontWeight: 500 }}>
+              Valide par : {profil ? `${profil.prenom || ''} ${profil.nom || ''}`.trim() || profil.email : 'Utilisateur'}
             </div>
             <div className="form-group">
               <label className="form-label">Observation (optionnel)</label>
-              <textarea className="form-input" value={observation} onChange={e => setObservation(e.target.value)} placeholder="Réserve, commentaire…" rows={2} />
+              <textarea className="form-input" value={observation} onChange={e => setObservation(e.target.value)} placeholder="Reserve, commentaire..." rows={2} autoFocus />
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button className="btn-save" onClick={confirmerCochage} disabled={!validePar.trim()}>Valider</button>
-              <button className="btn-cancel" onClick={() => setModalCocher(null)}>Annuler</button>
+              <button className="btn-save" onClick={confirmerCochage}>Valider</button>
+              <button className="btn-cancel" onClick={() => { setModalCocher(null); setObservation('') }}>Annuler</button>
             </div>
           </div>
         </div>
