@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
+import { useRealtime } from '../hooks/useRealtime'
 
 const BADGE_RESULTAT = {
   'Conforme':      { bg: '#EAF3DE', color: '#3B6D11' },
@@ -39,6 +40,7 @@ export default function Controles() {
   const [loading, setLoading] = useState(true)
   const [confirmSuppr, setConfirmSuppr] = useState(null)
 
+  useRealtime('controles', charger)
   useEffect(() => { charger() }, [id])
 
   async function charger() {
