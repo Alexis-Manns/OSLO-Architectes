@@ -74,6 +74,12 @@ export default function Topbar({ breadcrumb, phase, onPhaseChange, profil, onDec
                     {profil.role}
                   </span>
                 </div>
+                <button
+                  onClick={() => { setMenuProfil(false); navigate('/guide') }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--texte)', fontFamily: 'inherit', borderBottom: '1px solid var(--bordure)' }}
+                >
+                  Guide d'utilisation
+                </button>
                 {isAssocie && (
                   <button
                     onClick={() => { setMenuProfil(false); navigate('/admin') }}
