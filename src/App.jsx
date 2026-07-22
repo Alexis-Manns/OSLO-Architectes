@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import Login from './pages/Login'
 import Admin from './pages/Admin'
 import Feedback from './pages/Feedback'
+import GuideUtilisation from './pages/GuideUtilisation'
 import Accueil from './pages/Accueil'
 import EcranProjet from './pages/EcranProjet'
 import Collaborateurs from './pages/Collaborateurs'
@@ -48,6 +49,7 @@ function RoutesProtegees() {
     <>
       <Routes>
         <Route path="/" element={<Accueil />} />
+        <Route path="/guide" element={<GuideUtilisation />} />
         {isAssocie && <Route path="/admin" element={<Admin />} />}
         {isAssocie && <Route path="/feedback" element={<Feedback />} />}
         <Route path="/projet/:id" element={<EcranProjet />} />
