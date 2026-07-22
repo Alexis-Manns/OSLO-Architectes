@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import Topbar from '../components/Topbar'
 import Avatar from '../components/Avatar'
 import { supabase } from '../lib/supabase'
-import { useRealtime } from '../hooks/useRealtime'
+import { useRealtime } from '../useRealtime'
 import { useAuth } from '../context/AuthContext'
 
 const TYPES = ['Bug', 'Amélioration', 'Question', 'Autre']
