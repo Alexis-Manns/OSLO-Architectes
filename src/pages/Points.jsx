@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
+import { useRealtime } from '../hooks/useRealtime'
 
 const STATUT_DOT = { 'Ouvert': '#E24B4A', 'En suivi': '#EF9F27', 'Résolu': '#639922' }
 const STATUT_BADGE = {
@@ -34,6 +35,7 @@ export default function Points() {
   const [loading, setLoading] = useState(true)
   const [confirmSuppr, setConfirmSuppr] = useState(null)
 
+  useRealtime('points_critiques', charger)
   useEffect(() => { charger() }, [id])
 
   async function charger() {
