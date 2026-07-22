@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
+import { useRealtime } from '../hooks/useRealtime'
 import { useAuth } from '../context/AuthContext'
 
 const PHASES_BADGES = {
@@ -38,6 +39,7 @@ export default function Accueil() {
   const [formNouv, setFormNouv] = useState({ nom: '', reference: '', phase: 'EXE' })
   const [savingNouv, setSavingNouv] = useState(false)
 
+  useRealtime('projets', charger)
   useEffect(() => { charger() }, [user])
 
   // Fermer menu si clic extérieur
