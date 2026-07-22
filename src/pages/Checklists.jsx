@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
@@ -18,15 +18,15 @@ const PHASES_ORDRE = [
 ]
 
 const PHASES_COULEURS = {
-  'Démarrage chantier':      '#534AB7',
-  'Terrassement / Fondation':'#854F0B',
-  'Gros Oeuvre':             '#3B6D11',
-  'Clos couvert':            '#185FA5',
-  'Second Oeuvre':           '#993C1D',
-  'Façade':                  '#A32D2D',
-  'Finitions':               '#5F5E5A',
-  'AOR':                     '#0F6E56',
-  'OPC':                     '#185FA5',
+  'Démarrage chantier':       '#534AB7',
+  'Terrassement / Fondation': '#854F0B',
+  'Gros Oeuvre':              '#3B6D11',
+  'Clos couvert':             '#185FA5',
+  'Second Oeuvre':            '#993C1D',
+  'Façade':                   '#A32D2D',
+  'Finitions':                '#5F5E5A',
+  'AOR':                      '#0F6E56',
+  'OPC':                      '#185FA5',
 }
 
 const BASE_ITEMS = {
@@ -240,8 +240,8 @@ export default function Checklists() {
   const { id } = useParams()
   const location = useLocation()
   const projet = location.state?.projet || { nom: 'Projet', phase: 'EXE' }
-
   const { profil } = useAuth()
+
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [phaseActive, setPhaseActive] = useState('Démarrage chantier')
@@ -251,17 +251,22 @@ export default function Checklists() {
   const [nouveauItem, setNouveauItem] = useState({ phase: 'Démarrage chantier', description: '' })
   const [observation, setObservation] = useState('')
 
+  // Drag & drop
+  const dragItem = useRef(null)
+  const [dragOverId, setDragOverId] = useState(null)
+
   useRealtime('checklist_items', charger)
   useEffect(() => { charger() }, [id])
 
   async function charger() {
-    setLoading(true)
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('checklist_items')
       .select('*')
       .eq('projet_id', id)
       .order('ordre', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: true })
+
+    if (error) { console.error(error); setLoading(false); return }
 
     if (!data || data.length === 0) {
       await injecterBaseItems()
@@ -275,20 +280,16 @@ export default function Checklists() {
     const now = new Date().toISOString()
     const toInsert = []
     for (const [phase, descs] of Object.entries(BASE_ITEMS)) {
-      for (const desc of descs) {
+      descs.forEach((desc, i) => {
         toInsert.push({
           projet_id: id,
           description: desc,
           phase: phase,
-          ordre: toInsert.filter(t => t.phase === phase).length,
+          ordre: i,
           coche: false,
-          coche_le: null,
-          valide_par: null,
-          observation: null,
-          assigne_a: null,
           created_at: now,
         })
-      }
+      })
     }
     const { data } = await supabase.from('checklist_items').insert(toInsert).select()
     setItems(data || [])
@@ -296,7 +297,6 @@ export default function Checklists() {
 
   async function cocherItem(item) {
     if (item.coche) {
-      // Décocher
       const { data } = await supabase
         .from('checklist_items')
         .update({ coche: false, coche_le: null, valide_par: null, observation: null })
@@ -305,9 +305,7 @@ export default function Checklists() {
         .single()
       setItems(prev => prev.map(i => i.id === item.id ? data : i))
     } else {
-      // Ouvrir le modal pour valider
       setModalCocher(item)
-      setValidePar('')
       setObservation('')
     }
   }
@@ -335,7 +333,7 @@ export default function Checklists() {
 
   async function ajouterItem() {
     if (!nouveauItem.description.trim()) return
-    const maxOrdre = Math.max(0, ...items.filter(i => i.phase === nouveauItem.phase).map(i => i.ordre || 0))
+    const maxOrdre = Math.max(-1, ...items.filter(i => i.phase === nouveauItem.phase).map(i => i.ordre ?? 0))
     const { data } = await supabase
       .from('checklist_items')
       .insert({
@@ -350,25 +348,8 @@ export default function Checklists() {
       .single()
     setItems(prev => [...prev, data])
     setModalAjout(false)
-    setNouveauItem({ phase: phaseActive, description: '' })
     setPhaseActive(nouveauItem.phase)
-  }
-
-  async function deplacerItem(item, direction) {
-    const liste = items.filter(i => i.phase === item.phase).sort((a, b) => (a.ordre || 0) - (b.ordre || 0))
-    const idx = liste.findIndex(i => i.id === item.id)
-    const cible = direction === 'haut' ? idx - 1 : idx + 1
-    if (cible < 0 || cible >= liste.length) return
-    const autre = liste[cible]
-    const ordreItem = item.ordre ?? idx
-    const ordreAutre = autre.ordre ?? cible
-    await supabase.from('checklist_items').update({ ordre: ordreAutre }).eq('id', item.id)
-    await supabase.from('checklist_items').update({ ordre: ordreItem }).eq('id', autre.id)
-    setItems(prev => prev.map(i => {
-      if (i.id === item.id) return { ...i, ordre: ordreAutre }
-      if (i.id === autre.id) return { ...i, ordre: ordreItem }
-      return i
-    }))
+    setNouveauItem({ phase: nouveauItem.phase, description: '' })
   }
 
   async function supprimerItem(item) {
@@ -377,7 +358,60 @@ export default function Checklists() {
     setConfirmSuppr(null)
   }
 
-  const itemsPhase = items.filter(i => i.phase === phaseActive).sort((a, b) => (a.ordre || 0) - (b.ordre || 0))
+  // ─── DRAG & DROP ───
+  function handleDragStart(e, item) {
+    dragItem.current = item
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  function handleDragOver(e, item) {
+    e.preventDefault()
+    if (dragItem.current && item.id !== dragItem.current.id) {
+      setDragOverId(item.id)
+    }
+  }
+
+  async function handleDrop(e, targetItem) {
+    e.preventDefault()
+    setDragOverId(null)
+    const source = dragItem.current
+    dragItem.current = null
+    if (!source || source.id === targetItem.id) return
+
+    // Réordonner la liste de la phase
+    const liste = items
+      .filter(i => i.phase === phaseActive)
+      .sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0))
+
+    const fromIdx = liste.findIndex(i => i.id === source.id)
+    const toIdx   = liste.findIndex(i => i.id === targetItem.id)
+    if (fromIdx === -1 || toIdx === -1) return
+
+    const nouvelleListe = [...liste]
+    nouvelleListe.splice(fromIdx, 1)
+    nouvelleListe.splice(toIdx, 0, source)
+
+    // Réattribuer les ordres localement
+    const updates = nouvelleListe.map((item, idx) => ({ id: item.id, ordre: idx }))
+    setItems(prev => prev.map(i => {
+      const u = updates.find(u => u.id === i.id)
+      return u ? { ...i, ordre: u.ordre } : i
+    }))
+
+    // Sauvegarder en BDD
+    for (const u of updates) {
+      await supabase.from('checklist_items').update({ ordre: u.ordre }).eq('id', u.id)
+    }
+  }
+
+  function handleDragEnd() {
+    dragItem.current = null
+    setDragOverId(null)
+  }
+
+  const itemsPhase = items
+    .filter(i => i.phase === phaseActive)
+    .sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0))
   const coches = itemsPhase.filter(i => i.coche).length
   const total = itemsPhase.length
   const pct = total > 0 ? Math.round((coches / total) * 100) : 0
@@ -393,7 +427,7 @@ export default function Checklists() {
         phase={projet.phase}
       />
       <div className="content">
-        {loading ? <div className="loading">Chargement…</div> : (
+        {loading ? <div className="loading">Chargement...</div> : (
           <>
             {/* Sélecteur de phase */}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
@@ -402,28 +436,21 @@ export default function Checklists() {
                 const c = items.filter(i => i.phase === p && i.coche).length
                 const isActive = phaseActive === p
                 return (
-                  <button
-                    key={p}
-                    onClick={() => setPhaseActive(p)}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: 20,
-                      fontSize: 12,
-                      fontFamily: 'inherit',
-                      cursor: 'pointer',
-                      border: isActive ? `2px solid ${PHASES_COULEURS[p]}` : '1px solid var(--bordure)',
-                      background: isActive ? PHASES_COULEURS[p] + '18' : 'var(--blanc)',
-                      color: isActive ? PHASES_COULEURS[p] : 'var(--texte-sec)',
-                      fontWeight: isActive ? 600 : 400,
-                    }}
-                  >
+                  <button key={p} onClick={() => setPhaseActive(p)} style={{
+                    padding: '6px 12px', borderRadius: 20, fontSize: 12,
+                    fontFamily: 'inherit', cursor: 'pointer',
+                    border: isActive ? `2px solid ${PHASES_COULEURS[p]}` : '1px solid var(--bordure)',
+                    background: isActive ? PHASES_COULEURS[p] + '18' : 'var(--blanc)',
+                    color: isActive ? PHASES_COULEURS[p] : 'var(--texte-sec)',
+                    fontWeight: isActive ? 600 : 400,
+                  }}>
                     {p}
                     {n > 0 && (
                       <span style={{
                         marginLeft: 6, fontSize: 10,
                         background: c === n ? '#EAF3DE' : 'rgba(0,0,0,0.08)',
                         color: c === n ? '#3B6D11' : 'inherit',
-                        padding: '1px 6px', borderRadius: 10
+                        padding: '1px 6px', borderRadius: 10,
                       }}>{c}/{n}</span>
                     )}
                   </button>
@@ -444,14 +471,32 @@ export default function Checklists() {
               </div>
             )}
 
-            {/* Liste des items */}
+            {/* Liste des items — drag & drop */}
             {itemsPhase.length === 0 ? (
               <div style={{ color: 'var(--texte-sec)', fontSize: 13, padding: '20px 0', textAlign: 'center' }}>
                 Aucun item pour cette phase
               </div>
             ) : (
               itemsPhase.map(item => (
-                <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--bordure)' }}>
+                <div
+                  key={item.id}
+                  draggable
+                  onDragStart={e => handleDragStart(e, item)}
+                  onDragOver={e => handleDragOver(e, item)}
+                  onDrop={e => handleDrop(e, item)}
+                  onDragEnd={handleDragEnd}
+                  style={{
+                    display: 'flex', alignItems: 'flex-start', gap: 10,
+                    padding: '10px 4px',
+                    borderBottom: '1px solid var(--bordure)',
+                    borderTop: dragOverId === item.id ? `2px solid ${PHASES_COULEURS[phaseActive]}` : '2px solid transparent',
+                    cursor: 'grab',
+                    background: dragOverId === item.id ? PHASES_COULEURS[phaseActive] + '0A' : 'transparent',
+                    transition: 'background 0.15s',
+                  }}
+                >
+                  {/* Poignée de drag */}
+                  <span style={{ color: '#ccc', fontSize: 14, cursor: 'grab', flexShrink: 0, marginTop: 2, userSelect: 'none' }}>⠿</span>
                   <input
                     type="checkbox"
                     checked={item.coche}
@@ -468,27 +513,10 @@ export default function Checklists() {
                     </div>
                     {item.coche && (
                       <div style={{ fontSize: 11, color: 'var(--texte-sec)', marginTop: 3 }}>
-                        ✓ Validé par {item.valide_par} · {dateFR(item.coche_le)}
+                        Validé par {item.valide_par} · {dateFR(item.coche_le)}
                         {item.observation && <span style={{ marginLeft: 8, color: '#854F0B' }}>— {item.observation}</span>}
                       </div>
                     )}
-                    {!item.coche && item.assigne_a && (
-                      <div style={{ fontSize: 11, color: 'var(--texte-sec)', marginTop: 3 }}>
-                        Assigné à {item.assigne_a}
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 0, flexShrink: 0 }}>
-                    <button onClick={() => deplacerItem(item, 'haut')}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: 11, padding: '0 4px', lineHeight: 1.2 }}
-                      onMouseEnter={e => e.currentTarget.style.color = 'var(--orange)'}
-                      onMouseLeave={e => e.currentTarget.style.color = '#ccc'}
-                    >▲</button>
-                    <button onClick={() => deplacerItem(item, 'bas')}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: 11, padding: '0 4px', lineHeight: 1.2 }}
-                      onMouseEnter={e => e.currentTarget.style.color = 'var(--orange)'}
-                      onMouseLeave={e => e.currentTarget.style.color = '#ccc'}
-                    >▼</button>
                   </div>
                   <button
                     onClick={() => setConfirmSuppr(item)}
@@ -500,7 +528,8 @@ export default function Checklists() {
               ))
             )}
 
-            <button className="btn-add" style={{ marginTop: 12 }} onClick={() => { setNouveauItem({ phase: phaseActive, description: '' }); setModalAjout(true) }}>
+            <button className="btn-add" style={{ marginTop: 12 }}
+              onClick={() => { setNouveauItem({ phase: phaseActive, description: '' }); setModalAjout(true) }}>
               + Ajouter un item
             </button>
           </>
@@ -513,12 +542,12 @@ export default function Checklists() {
           <div style={{ background: 'var(--blanc)', borderRadius: 12, padding: 24, maxWidth: 420, width: '100%' }}>
             <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 6 }}>Valider cet item</div>
             <div style={{ fontSize: 13, color: 'var(--texte-sec)', marginBottom: 4, lineHeight: 1.5 }}>{modalCocher.description}</div>
-            <div style={{ fontSize: 12, color: 'var(--orange)', marginBottom: 16, fontWeight: 500 }}>
-              Valide par : {profil ? `${profil.prenom || ''} ${profil.nom || ''}`.trim() || profil.email : 'Utilisateur'}
+            <div style={{ fontSize: 12, color: '#FF8C00', marginBottom: 16, fontWeight: 500 }}>
+              Validé par : {profil ? `${profil.prenom || ''} ${profil.nom || ''}`.trim() || profil.email : 'Utilisateur'}
             </div>
             <div className="form-group">
               <label className="form-label">Observation (optionnel)</label>
-              <textarea className="form-input" value={observation} onChange={e => setObservation(e.target.value)} placeholder="Reserve, commentaire..." rows={2} autoFocus />
+              <textarea className="form-input" value={observation} onChange={e => setObservation(e.target.value)} placeholder="Réserve, commentaire..." rows={2} autoFocus />
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button className="btn-save" onClick={confirmerCochage}>Valider</button>
@@ -541,7 +570,7 @@ export default function Checklists() {
             </div>
             <div className="form-group">
               <label className="form-label">Description *</label>
-              <textarea className="form-input" value={nouveauItem.description} onChange={e => setNouveauItem(n => ({ ...n, description: e.target.value }))} placeholder="Ex: Vérifier les armatures avant coulage…" rows={3} autoFocus />
+              <textarea className="form-input" value={nouveauItem.description} onChange={e => setNouveauItem(n => ({ ...n, description: e.target.value }))} placeholder="Ex: Vérifier les armatures avant coulage..." rows={3} autoFocus />
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button className="btn-save" onClick={ajouterItem} disabled={!nouveauItem.description.trim()}>Ajouter</button>
@@ -557,7 +586,7 @@ export default function Checklists() {
           <div style={{ background: 'var(--blanc)', borderRadius: 12, padding: 24, maxWidth: 380, width: '100%' }}>
             <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 8 }}>Supprimer cet item</div>
             <div style={{ fontSize: 13, color: 'var(--texte-sec)', marginBottom: 20, lineHeight: 1.5 }}>
-              "{confirmSuppr.description}"<br />
+              "{confirmSuppr.description}"
               <span style={{ marginTop: 6, display: 'block', color: '#E24B4A' }}>Cette action est irréversible.</span>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
