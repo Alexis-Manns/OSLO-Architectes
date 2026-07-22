@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
-import { useRealtime } from '../hooks/useRealtime'
+import { useRealtime } from '../useRealtime'
 
 const BADGE_RESULTAT = {
   'Conforme':      { bg: '#EAF3DE', color: '#3B6D11' },
