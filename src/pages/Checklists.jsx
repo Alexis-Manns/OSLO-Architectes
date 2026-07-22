@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
+import { useRealtime } from '../hooks/useRealtime'
 import { useAuth } from '../context/AuthContext'
 
 const PHASES_ORDRE = [
@@ -250,6 +251,7 @@ export default function Checklists() {
   const [nouveauItem, setNouveauItem] = useState({ phase: 'Démarrage chantier', description: '' })
   const [observation, setObservation] = useState('')
 
+  useRealtime('checklist_items', charger)
   useEffect(() => { charger() }, [id])
 
   async function charger() {
@@ -258,6 +260,7 @@ export default function Checklists() {
       .from('checklist_items')
       .select('*')
       .eq('projet_id', id)
+      .order('ordre', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: true })
 
     if (!data || data.length === 0) {
@@ -277,6 +280,7 @@ export default function Checklists() {
           projet_id: id,
           description: desc,
           phase: phase,
+          ordre: toInsert.filter(t => t.phase === phase).length,
           coche: false,
           coche_le: null,
           valide_par: null,
@@ -331,12 +335,14 @@ export default function Checklists() {
 
   async function ajouterItem() {
     if (!nouveauItem.description.trim()) return
+    const maxOrdre = Math.max(0, ...items.filter(i => i.phase === nouveauItem.phase).map(i => i.ordre || 0))
     const { data } = await supabase
       .from('checklist_items')
       .insert({
         projet_id: id,
         description: nouveauItem.description,
         phase: nouveauItem.phase,
+        ordre: maxOrdre + 1,
         coche: false,
         created_at: new Date().toISOString(),
       })
@@ -348,13 +354,30 @@ export default function Checklists() {
     setPhaseActive(nouveauItem.phase)
   }
 
+  async function deplacerItem(item, direction) {
+    const liste = items.filter(i => i.phase === item.phase).sort((a, b) => (a.ordre || 0) - (b.ordre || 0))
+    const idx = liste.findIndex(i => i.id === item.id)
+    const cible = direction === 'haut' ? idx - 1 : idx + 1
+    if (cible < 0 || cible >= liste.length) return
+    const autre = liste[cible]
+    const ordreItem = item.ordre ?? idx
+    const ordreAutre = autre.ordre ?? cible
+    await supabase.from('checklist_items').update({ ordre: ordreAutre }).eq('id', item.id)
+    await supabase.from('checklist_items').update({ ordre: ordreItem }).eq('id', autre.id)
+    setItems(prev => prev.map(i => {
+      if (i.id === item.id) return { ...i, ordre: ordreAutre }
+      if (i.id === autre.id) return { ...i, ordre: ordreItem }
+      return i
+    }))
+  }
+
   async function supprimerItem(item) {
     await supabase.from('checklist_items').delete().eq('id', item.id)
     setItems(prev => prev.filter(i => i.id !== item.id))
     setConfirmSuppr(null)
   }
 
-  const itemsPhase = items.filter(i => i.phase === phaseActive)
+  const itemsPhase = items.filter(i => i.phase === phaseActive).sort((a, b) => (a.ordre || 0) - (b.ordre || 0))
   const coches = itemsPhase.filter(i => i.coche).length
   const total = itemsPhase.length
   const pct = total > 0 ? Math.round((coches / total) * 100) : 0
@@ -454,6 +477,18 @@ export default function Checklists() {
                         Assigné à {item.assigne_a}
                       </div>
                     )}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 0, flexShrink: 0 }}>
+                    <button onClick={() => deplacerItem(item, 'haut')}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: 11, padding: '0 4px', lineHeight: 1.2 }}
+                      onMouseEnter={e => e.currentTarget.style.color = 'var(--orange)'}
+                      onMouseLeave={e => e.currentTarget.style.color = '#ccc'}
+                    >▲</button>
+                    <button onClick={() => deplacerItem(item, 'bas')}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: 11, padding: '0 4px', lineHeight: 1.2 }}
+                      onMouseEnter={e => e.currentTarget.style.color = 'var(--orange)'}
+                      onMouseLeave={e => e.currentTarget.style.color = '#ccc'}
+                    >▼</button>
                   </div>
                   <button
                     onClick={() => setConfirmSuppr(item)}
