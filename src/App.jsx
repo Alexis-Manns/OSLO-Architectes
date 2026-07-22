@@ -4,7 +4,6 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import Login from './pages/Login'
 import Admin from './pages/Admin'
 import Feedback from './pages/Feedback'
-import GuideUtilisation from './pages/GuideUtilisation'
 import Accueil from './pages/Accueil'
 import EcranProjet from './pages/EcranProjet'
 import Collaborateurs from './pages/Collaborateurs'
@@ -22,12 +21,11 @@ function CompteInactif() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--fond)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ background: 'var(--blanc)', border: '1px solid var(--bordure)', borderRadius: 16, padding: 36, maxWidth: 400, textAlign: 'center' }}>
-        <div style={{ fontSize: 40, marginBottom: 14 }}>⏳</div>
         <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Compte en attente de validation</div>
         <div style={{ fontSize: 13, color: 'var(--texte-sec)', lineHeight: 1.6, marginBottom: 20 }}>
-          Bonjour {profil?.prenom || ''} ! Votre compte doit être activé par un administrateur avant de pouvoir accéder à l'application.
+          Bonjour {profil?.prenom || ''} ! Votre compte doit etre active par un administrateur avant de pouvoir acceder a l'application.
         </div>
-        <button className="btn-cancel" onClick={deconnexion} style={{ width: '100%' }}>Se déconnecter</button>
+        <button className="btn-cancel" onClick={deconnexion} style={{ width: '100%' }}>Se deconnecter</button>
       </div>
     </div>
   )
@@ -49,7 +47,6 @@ function RoutesProtegees() {
     <>
       <Routes>
         <Route path="/" element={<Accueil />} />
-        <Route path="/guide" element={<GuideUtilisation />} />
         {isAssocie && <Route path="/admin" element={<Admin />} />}
         {isAssocie && <Route path="/feedback" element={<Feedback />} />}
         <Route path="/projet/:id" element={<EcranProjet />} />
