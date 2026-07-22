@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
-import { useRealtime } from '../hooks/useRealtime'
+import { useRealtime } from '../useRealtime'
 
 const STATUT_DOT = { 'Ouvert': '#E24B4A', 'En suivi': '#EF9F27', 'Résolu': '#639922' }
 const STATUT_BADGE = {
