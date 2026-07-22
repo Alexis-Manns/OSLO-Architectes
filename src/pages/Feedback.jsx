@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import Topbar from '../components/Topbar'
 import Avatar from '../components/Avatar'
 import { supabase } from '../lib/supabase'
+import { useRealtime } from '../hooks/useRealtime'
 import { useAuth } from '../context/AuthContext'
 
 const TYPES = ['Bug', 'Amélioration', 'Question', 'Autre']
@@ -34,6 +35,7 @@ export default function Feedback() {
     setDeveloppé(prev => ({ ...prev, [id]: !prev[id] }))
   }
 
+  useRealtime('feedbacks', charger)
   useEffect(() => { charger() }, [])
 
   async function charger() {
