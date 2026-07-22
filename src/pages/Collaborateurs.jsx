@@ -3,6 +3,7 @@ import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import Avatar from '../components/Avatar'
 import { supabase } from '../lib/supabase'
+import { useRealtime } from '../hooks/useRealtime'
 import ModalRecherche from '../components/ModalRecherche'
 
 export default function Collaborateurs() {
@@ -20,6 +21,7 @@ export default function Collaborateurs() {
   const [entrepriseSelectee, setEntrepriseSelectee] = useState(null)
   const [confirmSuppr, setConfirmSuppr] = useState(null)
 
+  useRealtime('affectations', charger)
   useEffect(() => { charger() }, [id])
 
   async function charger() {
