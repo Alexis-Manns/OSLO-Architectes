@@ -268,6 +268,7 @@ const CATEGORIE_COLORS = {
   'Guide interne': { bg: '#EAF3DE', color: '#3B6D11' },
   'Courriel type': { bg: '#FAEEDA', color: '#854F0B' },
 }
+
 export function FicheGuide() {
   const navigate = useNavigate()
   const { id, gid } = useParams()
