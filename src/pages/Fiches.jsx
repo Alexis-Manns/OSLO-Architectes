@@ -263,17 +263,6 @@ export function FicheContact() {
 }
 
 // ─── Fiche Guide ───────────────────────────────────────────────────────────
-import React, { useState, useEffect } from 'react'
-import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import Topbar from '../components/Topbar'
-import { supabase } from '../lib/supabase'
-
-const CATEGORIE_COLORS = {
-  'DTU':           { bg: '#EEEDFE', color: '#534AB7' },
-  'Guide interne': { bg: '#EAF3DE', color: '#3B6D11' },
-  'Courriel type': { bg: '#FAEEDA', color: '#854F0B' },
-}
-
 export function FicheGuide() {
   const navigate = useNavigate()
   const { id, gid } = useParams()
