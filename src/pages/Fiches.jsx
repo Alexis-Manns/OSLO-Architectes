@@ -274,9 +274,11 @@ export function FicheGuide() {
   const { id, gid } = useParams()
   const location = useLocation()
   const projet = location.state?.projet || { nom: 'Projet', phase: 'EXE' }
+  const { peutModifierCollabs, profil, deconnexion } = useAuth()
 
   const [guide, setGuide] = useState(location.state?.guide || null)
   const [loading, setLoading] = useState(!location.state?.guide)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (!guide && gid) charger()
@@ -289,6 +291,33 @@ export function FicheGuide() {
     setLoading(false)
   }
 
+  // Sauvegarde d'un champ modifié
+  async function sauvegarder(champ, valeur) {
+    if (!peutModifierCollabs) return
+    setSaving(true)
+    const maj = { [champ]: valeur }
+    const { data } = await supabase.from('guides').update(maj).eq('id', gid).select().single()
+    if (data) setGuide(data)
+    setSaving(false)
+  }
+
+  function ajouterPointCle() {
+    const nv = [...(guide.points_cles || []), 'Nouveau point à préciser']
+    sauvegarder('points_cles', nv)
+  }
+
+  function modifierPointCle(index, valeur) {
+    const nv = [...(guide.points_cles || [])]
+    nv[index] = valeur
+    sauvegarder('points_cles', nv)
+  }
+
+  function supprimerPointCle(index) {
+    const nv = [...(guide.points_cles || [])]
+    nv.splice(index, 1)
+    sauvegarder('points_cles', nv)
+  }
+
   if (loading) return (
     <div className="page">
       <Topbar breadcrumb={[
@@ -296,13 +325,14 @@ export function FicheGuide() {
         { label: projet.nom, path: `/projet/${id}` },
         { label: 'Guides', path: `/projet/${id}/guides` },
         { label: 'Fiche' },
-      ]} phase={projet.phase} />
+      ]} phase={projet.phase} profil={profil} onDeconnexion={deconnexion} />
       <div className="content"><div className="loading">Chargement...</div></div>
     </div>
   )
 
   if (!guide) return null
   const cc = CATEGORIE_COLORS[guide.categorie] || {}
+  const editable = peutModifierCollabs
 
   return (
     <div className="page">
@@ -311,55 +341,128 @@ export function FicheGuide() {
         { label: projet.nom, path: `/projet/${id}` },
         { label: 'Guides', path: `/projet/${id}/guides` },
         { label: guide.reference || guide.titre },
-      ]} phase={projet.phase} />
+      ]} phase={projet.phase} profil={profil} onDeconnexion={deconnexion} />
       <div className="content" style={{ maxWidth: 760 }}>
+        {/* Barre édition */}
+        {editable && (
+          <div style={{ fontSize: 12, color: '#FF8C00', marginBottom: 10, fontWeight: 500 }}>
+            ✎ Mode édition — cliquez sur les champs pour les modifier
+            {saving && <span style={{ marginLeft: 10, color: 'var(--texte-sec)' }}>Sauvegarde...</span>}
+          </div>
+        )}
+
         {/* Header fiche */}
         <div style={{ marginBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
             <span className="badge" style={{ background: cc.bg, color: cc.color, fontSize: 12 }}>{guide.categorie}</span>
-            {guide.reference && <span style={{ fontSize: 13, color: 'var(--texte-sec)', fontWeight: 500 }}>{guide.reference}</span>}
+            {editable ? (
+              <input
+                defaultValue={guide.reference || ''}
+                onBlur={e => e.target.value !== guide.reference && sauvegarder('reference', e.target.value)}
+                placeholder="Référence"
+                style={{ border: '1px dashed var(--bordure)', borderRadius: 4, padding: '2px 8px', fontSize: 13, color: 'var(--texte-sec)', fontWeight: 500, fontFamily: 'inherit', background: 'transparent', maxWidth: 200 }}
+              />
+            ) : (
+              guide.reference && <span style={{ fontSize: 13, color: 'var(--texte-sec)', fontWeight: 500 }}>{guide.reference}</span>
+            )}
           </div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--texte)', lineHeight: 1.3 }}>{guide.titre}</div>
+          {editable ? (
+            <textarea
+              defaultValue={guide.titre}
+              onBlur={e => e.target.value !== guide.titre && sauvegarder('titre', e.target.value)}
+              placeholder="Titre du guide"
+              rows={1}
+              style={{ fontSize: 20, fontWeight: 700, color: 'var(--texte)', lineHeight: 1.3, width: '100%', border: '1px dashed var(--bordure)', borderRadius: 6, padding: '6px 10px', fontFamily: 'inherit', resize: 'vertical', background: 'transparent' }}
+            />
+          ) : (
+            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--texte)', lineHeight: 1.3 }}>{guide.titre}</div>
+          )}
         </div>
 
         {/* Résumé */}
-        {guide.resume && (
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#FF8C00', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Résumé</div>
-            <div style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--texte)' }}>{guide.resume}</div>
-          </div>
-        )}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#FF8C00', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Résumé</div>
+          {editable ? (
+            <textarea
+              defaultValue={guide.resume || ''}
+              onBlur={e => e.target.value !== guide.resume && sauvegarder('resume', e.target.value)}
+              placeholder="Résumé du guide..."
+              rows={4}
+              style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--texte)', width: '100%', border: '1px dashed var(--bordure)', borderRadius: 6, padding: 10, fontFamily: 'inherit', resize: 'vertical', background: 'transparent' }}
+            />
+          ) : (
+            guide.resume && <div style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--texte)' }}>{guide.resume}</div>
+          )}
+        </div>
 
         {/* Points clés */}
-        {guide.points_cles && guide.points_cles.length > 0 && (
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#FF8C00', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Points clés et vigilances MOE</div>
-            <ul style={{ margin: 0, paddingLeft: 0, listStyle: 'none' }}>
-              {guide.points_cles.map((p, i) => (
-                <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--bordure)', fontSize: 13, lineHeight: 1.6 }}>
-                  <span style={{ color: '#FF8C00', fontWeight: 700, flexShrink: 0 }}>•</span>
-                  <span>{p}</span>
-                </li>
-              ))}
-            </ul>
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#FF8C00', textTransform: 'uppercase', letterSpacing: 0.5 }}>Points clés et vigilances MOE</div>
+            {editable && (
+              <button onClick={ajouterPointCle} style={{ background: 'none', border: '1px solid var(--bordure)', color: 'var(--texte-sec)', fontSize: 12, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit' }}>+ Ajouter</button>
+            )}
           </div>
-        )}
+          {(guide.points_cles || []).length === 0 && !editable && (
+            <div style={{ fontSize: 13, color: 'var(--texte-sec)', fontStyle: 'italic' }}>Aucun point clé.</div>
+          )}
+          <ul style={{ margin: 0, paddingLeft: 0, listStyle: 'none' }}>
+            {(guide.points_cles || []).map((p, i) => (
+              <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--bordure)', fontSize: 13, lineHeight: 1.6 }}>
+                <span style={{ color: '#FF8C00', fontWeight: 700, flexShrink: 0 }}>•</span>
+                {editable ? (
+                  <>
+                    <textarea
+                      defaultValue={p}
+                      onBlur={e => e.target.value !== p && modifierPointCle(i, e.target.value)}
+                      rows={1}
+                      style={{ flex: 1, border: 'none', background: 'transparent', fontFamily: 'inherit', fontSize: 13, lineHeight: 1.6, resize: 'vertical', padding: 0, outline: 'none' }}
+                      onFocus={e => e.target.style.background = '#FFF8F0'}
+                      onBlurCapture={e => e.target.style.background = 'transparent'}
+                    />
+                    <button onClick={() => supprimerPointCle(i)} style={{ background: 'none', border: 'none', color: '#ddd', fontSize: 14, cursor: 'pointer', padding: '0 4px', flexShrink: 0 }}
+                      onMouseEnter={e => e.currentTarget.style.color = '#E24B4A'}
+                      onMouseLeave={e => e.currentTarget.style.color = '#ddd'}>✕</button>
+                  </>
+                ) : (
+                  <span>{p}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
 
         {/* Tolérances */}
-        {guide.tolerances && (
-          <div style={{ marginBottom: 20, padding: 14, background: '#FFF8F0', border: '1px solid #FAEEDA', borderRadius: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#854F0B', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Tolérances</div>
-            <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--texte)' }}>{guide.tolerances}</div>
-          </div>
-        )}
+        <div style={{ marginBottom: 20, padding: 14, background: '#FFF8F0', border: '1px solid #FAEEDA', borderRadius: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#854F0B', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Tolérances</div>
+          {editable ? (
+            <textarea
+              defaultValue={guide.tolerances || ''}
+              onBlur={e => e.target.value !== guide.tolerances && sauvegarder('tolerances', e.target.value)}
+              placeholder="Tolérances chiffrées..."
+              rows={3}
+              style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--texte)', width: '100%', border: '1px dashed rgba(133,79,11,0.3)', borderRadius: 6, padding: 8, fontFamily: 'inherit', resize: 'vertical', background: 'transparent' }}
+            />
+          ) : (
+            guide.tolerances && <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--texte)' }}>{guide.tolerances}</div>
+          )}
+        </div>
 
-        {/* Contenu libre pour guides internes / courriels */}
-        {guide.contenu && (
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#FF8C00', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Contenu</div>
-            <div style={{ fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap', color: 'var(--texte)' }}>{guide.contenu}</div>
-          </div>
-        )}
+        {/* Contenu libre — utile pour guides internes et courriels */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#FF8C00', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Contenu détaillé</div>
+          {editable ? (
+            <textarea
+              defaultValue={guide.contenu || ''}
+              onBlur={e => e.target.value !== guide.contenu && sauvegarder('contenu', e.target.value)}
+              placeholder="Contenu du guide, texte du courriel, procédure détaillée..."
+              rows={8}
+              style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--texte)', width: '100%', border: '1px dashed var(--bordure)', borderRadius: 6, padding: 10, fontFamily: 'inherit', resize: 'vertical', background: 'transparent', whiteSpace: 'pre-wrap' }}
+            />
+          ) : (
+            guide.contenu && <div style={{ fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap', color: 'var(--texte)' }}>{guide.contenu}</div>
+          )}
+        </div>
 
         <div className="btn-row">
           <button className="btn-cancel" onClick={() => navigate(`/projet/${id}/guides`, { state: { projet } })}>Retour</button>
