@@ -42,7 +42,6 @@ export default function Topbar({ breadcrumb, phase, onPhaseChange, profil, onDec
           </select>
         )}
 
-        {/* Avatar profil */}
         {profil && (
           <div style={{ position: 'relative' }}>
             <button
@@ -74,24 +73,28 @@ export default function Topbar({ breadcrumb, phase, onPhaseChange, profil, onDec
                     {profil.role}
                   </span>
                 </div>
-                <button
-                  onClick={() => { setMenuProfil(false); navigate('/guide') }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--texte)', fontFamily: 'inherit', borderBottom: '1px solid var(--bordure)' }}
-                >
+
+                {isAssocie && (
+                  <button
+                    onClick={() => { setMenuProfil(false); navigate('/admin') }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--texte)', fontFamily: 'inherit', borderBottom: '1px solid var(--bordure)', textAlign: 'left' }}
+                  >
                     Administration
                   </button>
                 )}
+
                 {isAssocie && (
                   <button
                     onClick={() => { setMenuProfil(false); navigate('/feedback') }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--texte)', fontFamily: 'inherit', borderBottom: '1px solid var(--bordure)' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--texte)', fontFamily: 'inherit', borderBottom: '1px solid var(--bordure)', textAlign: 'left' }}
                   >
                     Retours utilisateurs
                   </button>
                 )}
+
                 <button
                   onClick={() => { setMenuProfil(false); onDeconnexion?.() }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#E24B4A', fontFamily: 'inherit' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#E24B4A', fontFamily: 'inherit', textAlign: 'left' }}
                 >
                   Se déconnecter
                 </button>
