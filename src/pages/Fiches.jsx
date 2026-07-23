@@ -263,36 +263,51 @@ export function FicheContact() {
 }
 
 // ─── Fiche Guide ───────────────────────────────────────────────────────────
+import React, { useState, useEffect } from 'react'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
+import Topbar from '../components/Topbar'
+import { supabase } from '../lib/supabase'
+
+const CATEGORIE_COLORS = {
+  'DTU':           { bg: '#EEEDFE', color: '#534AB7' },
+  'Guide interne': { bg: '#EAF3DE', color: '#3B6D11' },
+  'Courriel type': { bg: '#FAEEDA', color: '#854F0B' },
+}
+
 export function FicheGuide() {
   const navigate = useNavigate()
   const { id, gid } = useParams()
   const location = useLocation()
   const projet = location.state?.projet || { nom: 'Projet', phase: 'EXE' }
-  const g = location.state?.guide || {}
 
-  const [form, setForm] = useState({
-    titre:     g.titre         || '',
-    categorie: g.categorie     || 'Normes / DTU',
-    resume:    g.resume        || '',
-    lien:      g.lien_document || '',
-  })
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved]   = useState(false)
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const [guide, setGuide] = useState(location.state?.guide || null)
+  const [loading, setLoading] = useState(!location.state?.guide)
 
-  async function enregistrer() {
-    setSaving(true)
-    await supabase.from('guides').update({
-      titre: form.titre, categorie: form.categorie,
-      resume: form.resume, lien_document: form.lien,
-      updated_at: new Date().toISOString(),
-    }).eq('id', gid)
-    setSaved(true)
-    setTimeout(() => {
-      navigate(`/projet/${id}/guides`, { state: { projet } })
-    }, 800)
-    setSaving(false)
+  useEffect(() => {
+    if (!guide && gid) charger()
+  }, [gid])
+
+  async function charger() {
+    setLoading(true)
+    const { data } = await supabase.from('guides').select('*').eq('id', gid).single()
+    setGuide(data)
+    setLoading(false)
   }
+
+  if (loading) return (
+    <div className="page">
+      <Topbar breadcrumb={[
+        { label: 'Mes projets', path: '/' },
+        { label: projet.nom, path: `/projet/${id}` },
+        { label: 'Guides', path: `/projet/${id}/guides` },
+        { label: 'Fiche' },
+      ]} phase={projet.phase} />
+      <div className="content"><div className="loading">Chargement...</div></div>
+    </div>
+  )
+
+  if (!guide) return null
+  const cc = CATEGORIE_COLORS[guide.categorie] || {}
 
   return (
     <div className="page">
@@ -300,20 +315,59 @@ export function FicheGuide() {
         { label: 'Mes projets', path: '/' },
         { label: projet.nom, path: `/projet/${id}` },
         { label: 'Guides', path: `/projet/${id}/guides` },
-        { label: form.titre || 'Fiche guide' },
+        { label: guide.reference || guide.titre },
       ]} phase={projet.phase} />
-      <div className="content">
-        <div className="form-group"><label className="form-label">Titre</label><input className="form-input" value={form.titre} onChange={e => set('titre', e.target.value)} /></div>
-        <div className="form-group"><label className="form-label">Catégorie</label>
-          <select className="form-input" value={form.categorie} onChange={e => set('categorie', e.target.value)}>
-            <option>Normes / DTU</option><option>Guides internes</option><option>Modèles courriers</option>
-          </select>
+      <div className="content" style={{ maxWidth: 760 }}>
+        {/* Header fiche */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+            <span className="badge" style={{ background: cc.bg, color: cc.color, fontSize: 12 }}>{guide.categorie}</span>
+            {guide.reference && <span style={{ fontSize: 13, color: 'var(--texte-sec)', fontWeight: 500 }}>{guide.reference}</span>}
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--texte)', lineHeight: 1.3 }}>{guide.titre}</div>
         </div>
-        <div className="form-group"><label className="form-label">Résumé / Points clés</label><textarea className="form-input" value={form.resume} onChange={e => set('resume', e.target.value)} /></div>
-        <div className="form-group"><label className="form-label">Lien document</label><input className="form-input" type="url" value={form.lien} onChange={e => set('lien', e.target.value)} placeholder="https://…" /></div>
+
+        {/* Résumé */}
+        {guide.resume && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#FF8C00', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Résumé</div>
+            <div style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--texte)' }}>{guide.resume}</div>
+          </div>
+        )}
+
+        {/* Points clés */}
+        {guide.points_cles && guide.points_cles.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#FF8C00', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Points clés et vigilances MOE</div>
+            <ul style={{ margin: 0, paddingLeft: 0, listStyle: 'none' }}>
+              {guide.points_cles.map((p, i) => (
+                <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--bordure)', fontSize: 13, lineHeight: 1.6 }}>
+                  <span style={{ color: '#FF8C00', fontWeight: 700, flexShrink: 0 }}>•</span>
+                  <span>{p}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Tolérances */}
+        {guide.tolerances && (
+          <div style={{ marginBottom: 20, padding: 14, background: '#FFF8F0', border: '1px solid #FAEEDA', borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#854F0B', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Tolérances</div>
+            <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--texte)' }}>{guide.tolerances}</div>
+          </div>
+        )}
+
+        {/* Contenu libre pour guides internes / courriels */}
+        {guide.contenu && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#FF8C00', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Contenu</div>
+            <div style={{ fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap', color: 'var(--texte)' }}>{guide.contenu}</div>
+          </div>
+        )}
+
         <div className="btn-row">
-          <button className="btn-save" onClick={enregistrer} disabled={saving}>{saving ? 'Enregistrement…' : saved ? '✓ Enregistré' : 'Enregistrer'}</button>
-          <button className="btn-cancel" onClick={() => navigate(`/projet/${id}/guides`, { state: { projet } })}>Annuler</button>
+          <button className="btn-cancel" onClick={() => navigate(`/projet/${id}/guides`, { state: { projet } })}>Retour</button>
         </div>
       </div>
     </div>
