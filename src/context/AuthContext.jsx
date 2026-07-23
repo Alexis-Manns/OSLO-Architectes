@@ -69,6 +69,7 @@ export function AuthProvider({ children }) {
       peutArchiverProjet: isManager,
       peutSupprimerProjet: isAssocie,
       peutGererUsers:     isAssocie,
+      peutModifierCollabs: isManager,
     }}>
       {children}
     </AuthContext.Provider>
