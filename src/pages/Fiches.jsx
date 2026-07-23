@@ -263,6 +263,11 @@ export function FicheContact() {
 }
 
 // ─── Fiche Guide ───────────────────────────────────────────────────────────
+const CATEGORIE_COLORS = {
+  'DTU':           { bg: '#EEEDFE', color: '#534AB7' },
+  'Guide interne': { bg: '#EAF3DE', color: '#3B6D11' },
+  'Courriel type': { bg: '#FAEEDA', color: '#854F0B' },
+}
 export function FicheGuide() {
   const navigate = useNavigate()
   const { id, gid } = useParams()
