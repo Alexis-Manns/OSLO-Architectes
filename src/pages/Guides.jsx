@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { useRealtime } from '../useRealtime'
 import { useAuth } from '../context/AuthContext'
 
+
 const CATEGORIES = ['Tous', 'DTU', 'Guide interne', 'Courriel type']
 const CATEGORIES_CREATION = ['DTU', 'Guide interne', 'Courriel type']
 const CATEGORIE_COLORS = {
