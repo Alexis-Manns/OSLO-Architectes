@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
-import { useRealtime } from '../useRealtime'
+import { useRealtime } from '../hooks/useRealtime'
 import { useAuth } from '../context/AuthContext'
 
 const PHASES_BADGES = {
@@ -30,6 +30,8 @@ export default function Accueil() {
   const [menuOuvert, setMenuOuvert]   = useState(null)   // id du projet avec menu ouvert
   const [confirmSuppr, setConfirmSuppr] = useState(null)
   const [modalNouveau, setModalNouveau] = useState(false)
+  const [modalRenommer, setModalRenommer] = useState(null)
+  const [nouveauNom, setNouveauNom] = useState('')
   const [uploadingId, setUploadingId] = useState(null)
   const [hoveredId, setHoveredId]     = useState(null)
   const fileRefs = useRef({})
@@ -97,6 +99,14 @@ export default function Accueil() {
   async function supprimerProjet(projet) {
     await supabase.from('projets').delete().eq('id', projet.id)
     setConfirmSuppr(null)
+    charger()
+  }
+
+  async function renommerProjet() {
+    if (!nouveauNom.trim() || !modalRenommer) return
+    await supabase.from('projets').update({ nom: nouveauNom }).eq('id', modalRenommer.id)
+    setModalRenommer(null)
+    setNouveauNom('')
     charger()
   }
 
@@ -318,6 +328,22 @@ export default function Accueil() {
       )}
 
       {/* Confirmation suppression */}
+      {modalRenommer && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: 'var(--blanc)', borderRadius: 12, padding: 24, maxWidth: 400, width: '100%' }}>
+            <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 16 }}>Renommer le projet</div>
+            <div className="form-group">
+              <label className="form-label">Nom du projet</label>
+              <input className="form-input" value={nouveauNom} onChange={e => setNouveauNom(e.target.value)} autoFocus />
+            </div>
+            <div className="btn-row">
+              <button className="btn-save" onClick={renommerProjet} disabled={!nouveauNom.trim()}>Renommer</button>
+              <button className="btn-cancel" onClick={() => setModalRenommer(null)}>Annuler</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {confirmSuppr && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div style={{ background: 'var(--blanc)', borderRadius: 12, padding: 24, maxWidth: 380, width: '100%' }}>
