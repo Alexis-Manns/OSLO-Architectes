@@ -104,7 +104,19 @@ export default function Accueil() {
 
   async function renommerProjet() {
     if (!nouveauNom.trim() || !modalRenommer) return
-    await supabase.from('projets').update({ nom: nouveauNom }).eq('id', modalRenommer.id)
+    const nom = nouveauNom.trim()
+    const { error } = await supabase
+      .from('projets')
+      .update({ nom })
+      .eq('id', modalRenommer.id)
+
+    if (error) {
+      console.error('Erreur lors du renommage du projet :', error)
+      window.alert(`Impossible de renommer le projet : ${error.message}`)
+      return
+    }
+
+    setProjets(prev => prev.map(p => p.id === modalRenommer.id ? { ...p, nom } : p))
     setModalRenommer(null)
     setNouveauNom('')
     charger()
@@ -271,6 +283,16 @@ export default function Accueil() {
                                 <button onClick={() => dansMesProjets ? retirerDeMesProjets(p.id) : ajouterAMesProjets(p.id)}
                                   style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', color: 'var(--texte)', textAlign: 'left' }}>
                                   {dansMesProjets ? '➖ Retirer de mes projets' : '➕ Ajouter à mes projets'}
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setModalRenommer(p)
+                                    setNouveauNom(p.nom || '')
+                                    setMenuOuvert(null)
+                                  }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', color: 'var(--texte)', textAlign: 'left', borderTop: '1px solid var(--bordure)' }}
+                                >
+                                  ✏️ Renommer le projet
                                 </button>
                                 {peutArchiverProjet && (
                                   <button onClick={() => { archiverProjet(p.id); setMenuOuvert(null) }}
