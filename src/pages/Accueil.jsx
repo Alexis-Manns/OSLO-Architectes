@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
-import { useRealtime } from '../hooks/useRealtime'
+import { useRealtime } from '../useRealtime'
 import { useAuth } from '../context/AuthContext'
 
 const PHASES_BADGES = {
