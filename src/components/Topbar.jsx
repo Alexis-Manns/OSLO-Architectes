@@ -93,6 +93,13 @@ export default function Topbar({ breadcrumb, phase, onPhaseChange, profil, onDec
                 )}
 
                 <button
+                  onClick={() => { setMenuProfil(false); window.open('https://hflavrmdoikteqjzdplc.supabase.co/storage/v1/object/public/Documents/Guide%20utiisation.pdf', '_blank') }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--texte)', fontFamily: 'inherit', textAlign: 'left', borderBottom: '1px solid var(--bordure)' }}
+                >
+                  Guide d'utilisation
+                </button>
+
+                <button
                   onClick={() => { setMenuProfil(false); onDeconnexion?.() }}
                   style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#E24B4A', fontFamily: 'inherit', textAlign: 'left' }}
                 >
