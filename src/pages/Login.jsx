@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { supabase } from '../lib/supabase'
 
 export default function Login() {
   const { connexion, inscription } = useAuth()
@@ -10,6 +11,20 @@ export default function Login() {
   const [nom, setNom]           = useState('')
   const [erreur, setErreur]     = useState(null)
   const [loading, setLoading]   = useState(false)
+  const [resetEnvoye, setResetEnvoye] = useState(false)
+
+  async function handleReset(e) {
+    e.preventDefault()
+    if (!email.trim()) { setErreur('Veuillez entrer votre email.'); return }
+    setLoading(true)
+    setErreur(null)
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/reset-password',
+    })
+    setLoading(false)
+    if (error) { setErreur('Erreur lors de l\'envoi. Vérifiez votre email.'); return }
+    setResetEnvoye(true)
+  }
 
   async function handleConnexion(e) {
     e.preventDefault()
@@ -71,6 +86,52 @@ export default function Login() {
               Retour à la connexion
             </button>
           </div>
+        ) : mode === 'reset' ? (
+          <div>
+            {resetEnvoye ? (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 36, marginBottom: 14 }}>&#9993;</div>
+                <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Email envoyé !</div>
+                <div style={{ fontSize: 13, color: 'var(--texte-sec)', lineHeight: 1.6, marginBottom: 20 }}>
+                  Un lien de réinitialisation a été envoyé à <strong>{email}</strong>.
+                  Vérifiez votre boîte mail (et vos spams).
+                </div>
+                <button className="btn-cancel" onClick={() => { setMode('connexion'); setResetEnvoye(false) }} style={{ width: '100%' }}>
+                  Retour à la connexion
+                </button>
+              </div>
+            ) : (
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>Mot de passe oublié</div>
+                <div style={{ fontSize: 13, color: 'var(--texte-sec)', lineHeight: 1.6, marginBottom: 16 }}>
+                  Entrez votre email professionnel. Vous recevrez un lien pour créer un nouveau mot de passe.
+                </div>
+                <form onSubmit={handleReset}>
+                  <div className="form-group">
+                    <label className="form-label">Email professionnel</label>
+                    <input className="form-input" type="email" value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      placeholder="prenom.nom@oslo-architectes.fr" required autoFocus />
+                  </div>
+                  {erreur && (
+                    <div style={{ background: '#FCEBEB', border: '1px solid #F09595', color: '#A32D2D', padding: '10px 14px', borderRadius: 8, marginBottom: 14, fontSize: 13 }}>{erreur}</div>
+                  )}
+                  <button type="submit" disabled={loading} style={{
+                    width: '100%', background: '#FF8C00', color: 'white', border: 'none',
+                    padding: '11px', borderRadius: 8, fontSize: 14, fontWeight: 600,
+                    fontFamily: 'inherit', cursor: loading ? 'not-allowed' : 'pointer',
+                    opacity: loading ? 0.7 : 1,
+                  }}>
+                    {loading ? 'Envoi...' : 'Envoyer le lien'}
+                  </button>
+                </form>
+                <button onClick={() => { setMode('connexion'); setErreur(null) }}
+                  style={{ width: '100%', marginTop: 12, background: 'none', border: 'none', color: 'var(--texte-sec)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  Retour à la connexion
+                </button>
+              </div>
+            )}
+          </div>
         ) : (
           <>
             {/* Onglets connexion / inscription */}
@@ -102,7 +163,7 @@ export default function Login() {
                 <label className="form-label">Email professionnel</label>
                 <input className="form-input" type="email" value={email}
                   onChange={e => setEmail(e.target.value)}
-                  placeholder="email" required autoFocus />
+                  placeholder="prenom.nom@oslo-architectes.fr" required autoFocus />
               </div>
               <div className="form-group">
                 <label className="form-label">Mot de passe {mode === 'inscription' && '(8 caractères min.)'}</label>
@@ -123,8 +184,14 @@ export default function Login() {
                 fontFamily: 'inherit', cursor: loading ? 'not-allowed' : 'pointer',
                 opacity: loading ? 0.7 : 1, marginTop: 4,
               }}>
-                {loading ? 'Chargement…' : mode === 'connexion' ? 'Se connecter' : 'Créer mon compte'}
+                {loading ? 'Chargement...' : mode === 'connexion' ? 'Se connecter' : 'Créer mon compte'}
               </button>
+              {mode === 'connexion' && (
+                <button onClick={() => { setMode('reset'); setErreur(null) }}
+                  style={{ width: '100%', marginTop: 10, background: 'none', border: 'none', color: '#FF8C00', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  Mot de passe oublié ?
+                </button>
+              )}
             </form>
 
             {mode === 'inscription' && (
@@ -138,4 +205,3 @@ export default function Login() {
     </div>
   )
 }
-
