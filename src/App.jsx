@@ -5,6 +5,7 @@ import Login from './pages/Login'
 import Admin from './pages/Admin'
 import Feedback from './pages/Feedback'
 import Accueil from './pages/Accueil'
+import ResetPassword from './pages/ResetPassword'
 import EcranProjet from './pages/EcranProjet'
 import Collaborateurs from './pages/Collaborateurs'
 import Controles from './pages/Controles'
@@ -81,6 +82,7 @@ export default function App() {
     <AuthProvider>
       <Routes>
         <Route path="/login" element={<LoginRoute />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/*" element={<RoutesProtegees />} />
       </Routes>
     </AuthProvider>
