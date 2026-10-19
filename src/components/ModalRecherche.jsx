@@ -168,7 +168,7 @@ export default function ModalRecherche({ type, projetId, entreprise, onSelect, o
                   <select className="form-input" value={form.role || ''} onChange={e => setF('role', e.target.value)}>
                     <option value="">Choisir…</option>
                     <option>Associé(e)</option><option>Responsable pôle conception</option><option>Responsable pôle chantier</option>
-                    <option>Responsable de projet</option><option>Responsable de chantier</option><option>Responsable de projet/chantier</option><option>Chargé(e) de chantier</option><option>Développeur/Développeuse de projet</option></option>Infographiste 3D</option></option>Assistante administrative</option>
+                    <option>Responsable de projet</option><option>Responsable de chantier</option><option>Responsable de projet & chantier</option><option>Chargé(e) de chantier</option><option>Développeur(euse) de projet</option></option>Infographiste 3D</option></option>Assistante administrative</option>
                   </select>
                 </div>
                 <div className="form-group"><label className="form-label">Spécialité</label><input className="form-input" value={form.specialite || ''} onChange={e => setF('specialite', e.target.value)} /></div>
