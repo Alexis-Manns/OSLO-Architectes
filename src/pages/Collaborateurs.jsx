@@ -20,6 +20,13 @@ export default function Collaborateurs() {
   const [modal, setModal] = useState(null)
   const [entrepriseSelectee, setEntrepriseSelectee] = useState(null)
   const [confirmSuppr, setConfirmSuppr] = useState(null)
+  const [contactAModifier, setContactAModifier] = useState(null)
+  const [listeEntreprises, setListeEntreprises] = useState([])
+  const [nouvelleEntrepriseId, setNouvelleEntrepriseId] = useState('')
+  const [chargementEntreprises, setChargementEntreprises] = useState(false)
+  const [enregistrementEntreprise, setEnregistrementEntreprise] = useState(false)
+  const [erreurEntreprise, setErreurEntreprise] = useState('')
+  const [messageEntreprise, setMessageEntreprise] = useState('')
 
   useRealtime('affectations', charger)
   useEffect(() => { charger() }, [id])
@@ -111,6 +118,91 @@ export default function Collaborateurs() {
     charger()
   }
 
+  async function ouvrirChangementEntreprise(contact, entreprise) {
+    setContactAModifier({ contact, entreprise })
+    setNouvelleEntrepriseId(String(entreprise.id))
+    setListeEntreprises([])
+    setErreurEntreprise('')
+    setMessageEntreprise('')
+    await chargerListeEntreprises()
+  }
+
+  async function chargerListeEntreprises() {
+    setChargementEntreprises(true)
+    setErreurEntreprise('')
+    try {
+      // Toutes les entreprises, y compris celles qui ne sont pas liées au projet.
+      const { data, error } = await supabase
+        .from('entreprises')
+        .select('id, nom, type')
+        .order('nom')
+
+      if (error) throw error
+      setListeEntreprises(data || [])
+    } catch {
+      setErreurEntreprise('Impossible de charger les entreprises. Veuillez réessayer.')
+    } finally {
+      setChargementEntreprises(false)
+    }
+  }
+
+  async function changerEntreprise(event) {
+    event.preventDefault()
+    if (!contactAModifier || enregistrementEntreprise || chargementEntreprises) return
+
+    const { contact, entreprise: ancienneEntreprise } = contactAModifier
+    const entreprise = listeEntreprises.find(e => String(e.id) === nouvelleEntrepriseId)
+    if (!entreprise || String(entreprise.id) === String(ancienneEntreprise.id)) return
+
+    setEnregistrementEntreprise(true)
+    setErreurEntreprise('')
+    try {
+      // Seul le rattachement de la fiche change : son identifiant et ses
+      // affectations aux projets (rôle, lot, etc.) sont conservés.
+      const { data, error } = await supabase
+        .from('contacts')
+        .update({ entreprise_id: entreprise.id })
+        .eq('id', contact.id)
+        .select('id')
+        .maybeSingle()
+
+      if (error) throw error
+      if (!data) {
+        throw new Error('Le contact est introuvable ou vous ne pouvez pas le modifier.')
+      }
+
+      const contactMisAJour = {
+        ...contact,
+        entreprise_id: entreprise.id,
+        entreprises: entreprise
+      }
+
+      setEntreprises(actuelles => {
+        const nouvelles = actuelles.map(e => ({
+          ...e,
+          contacts: e.contacts.filter(c => c.id !== contact.id)
+        }))
+        const destination = nouvelles.find(e => String(e.id) === String(entreprise.id))
+        if (destination) {
+          destination.contacts.push(contactMisAJour)
+        } else {
+          nouvelles.push({ ...entreprise, contacts: [contactMisAJour] })
+        }
+        // Une entreprise liée explicitement au projet reste affichée, même vide.
+        return nouvelles.filter(e => e.affectation_entreprise_id || e.contacts.length > 0)
+      })
+      setDeplies(d => ({ ...d, [entreprise.id]: true }))
+      setMessageEntreprise(`${contact.prenom || ''} ${contact.nom || ''} est désormais rattaché(e) à ${entreprise.nom}.`)
+      setContactAModifier(null)
+    } catch (error) {
+      setErreurEntreprise(error instanceof Error
+        ? error.message
+        : 'Impossible de changer l’entreprise. Vérifiez vos droits et réessayez.')
+    } finally {
+      setEnregistrementEntreprise(false)
+    }
+  }
+
   async function supprimerCollab(collab) {
     await supabase.from('affectations').delete().eq('id', collab.affectation_id)
     setConfirmSuppr(null)
@@ -170,6 +262,11 @@ export default function Collaborateurs() {
         phase={projet.phase}
       />
       <div className="content">
+        {messageEntreprise && (
+          <div role="status" style={{ background: '#EAF3DE', color: '#3B6D11', padding: 12, borderRadius: 8, fontSize: 13, marginBottom: 16 }}>
+            {messageEntreprise}
+          </div>
+        )}
         <div className="tabs">
           <button className={`tab-btn ${onglet === 'agence' ? 'active' : ''}`} onClick={() => setOnglet('agence')}>Agence</button>
           <button className={`tab-btn ${onglet === 'entreprises' ? 'active' : ''}`} onClick={() => setOnglet('entreprises')}>Entreprises &amp; BE</button>
@@ -241,9 +338,9 @@ export default function Collaborateurs() {
                       </div>
                     )}
                     {e.contacts.map(c => (
-                      <div key={c.id} className="list-item" style={{ gap: 8 }}>
+                      <div key={c.id} className="list-item" style={{ gap: 8, flexWrap: 'wrap' }}>
                         <div
-                          style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, cursor: 'pointer' }}
+                          style={{ display: 'flex', alignItems: 'center', gap: 10, flex: '1 1 180px', minWidth: 0, cursor: 'pointer' }}
                           onClick={() => navigate(`/projet/${id}/contacts/${c.id}`, { state: { projet, contact: c, entreprise: e } })}
                         >
                           <Avatar nom={c.nom} prenom={c.prenom} size={34} />
@@ -268,6 +365,13 @@ export default function Collaborateurs() {
                           </div>
                           <span className="arrow">›</span>
                         </div>
+                        <button
+                          type="button"
+                          className="btn-cancel"
+                          style={{ fontSize: 12, padding: '6px 9px', flexShrink: 0 }}
+                          aria-label={`Changer l’entreprise de ${c.prenom || ''} ${c.nom || ''}`}
+                          onClick={() => ouvrirChangementEntreprise(c, e)}
+                        >Changer d’entreprise</button>
                         <BtnSuppr onClick={() => setConfirmSuppr({ type: 'contact', data: c, nom: `${c.prenom} ${c.nom}` })} />
                       </div>
                     ))}
@@ -283,6 +387,69 @@ export default function Collaborateurs() {
           </>
         )}
       </div>
+
+      {/* ── CHANGEMENT D’ENTREPRISE DU CONTACT ── */}
+      {contactAModifier && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <form
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="changement-entreprise-titre"
+            aria-busy={enregistrementEntreprise}
+            onSubmit={changerEntreprise}
+            onKeyDown={event => {
+              if (event.key === 'Escape' && !enregistrementEntreprise) setContactAModifier(null)
+            }}
+            style={{ background: 'var(--blanc)', borderRadius: 12, padding: 24, maxWidth: 420, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}
+          >
+            <div id="changement-entreprise-titre" style={{ fontWeight: 600, fontSize: 15, marginBottom: 8 }}>Changer d’entreprise</div>
+            <div style={{ color: 'var(--texte-sec)', fontSize: 13, marginBottom: 16 }}>
+              <strong>{contactAModifier.contact.prenom} {contactAModifier.contact.nom}</strong>
+              <div style={{ marginTop: 6 }}>Entreprise actuelle : {contactAModifier.entreprise.nom}</div>
+            </div>
+            <label htmlFor="nouvelle-entreprise" style={{ display: 'block', fontSize: 13, marginBottom: 6 }}>Nouvelle entreprise</label>
+            <select
+              id="nouvelle-entreprise"
+              autoFocus
+              required
+              value={nouvelleEntrepriseId}
+              onChange={event => { setNouvelleEntrepriseId(event.target.value); setErreurEntreprise('') }}
+              disabled={chargementEntreprises || enregistrementEntreprise}
+              style={{ width: '100%', boxSizing: 'border-box', padding: 10, border: '1px solid #ddd', borderRadius: 6, background: 'var(--blanc)', color: 'inherit', fontFamily: 'inherit', fontSize: 13 }}
+            >
+              {!listeEntreprises.some(e => String(e.id) === String(contactAModifier.entreprise.id)) && (
+                <option value={String(contactAModifier.entreprise.id)}>{contactAModifier.entreprise.nom} (actuelle)</option>
+              )}
+              {listeEntreprises.map(e => (
+                <option key={e.id} value={String(e.id)}>
+                  {e.nom}{String(e.id) === String(contactAModifier.entreprise.id) ? ' (actuelle)' : ''}
+                </option>
+              ))}
+            </select>
+            {chargementEntreprises && <div role="status" style={{ fontSize: 12, marginTop: 8 }}>Chargement des entreprises…</div>}
+            <p style={{ color: 'var(--texte-sec)', fontSize: 12, lineHeight: 1.5 }}>
+              La fiche et ses affectations sont conservées. Ce changement d’entreprise s’applique à tous les projets utilisant ce contact.
+            </p>
+            {erreurEntreprise && (
+              <div role="alert" style={{ color: '#E24B4A', fontSize: 13, marginBottom: 16 }}>
+                {erreurEntreprise}
+                {listeEntreprises.length === 0 && !chargementEntreprises && (
+                  <button type="button" className="btn-cancel" style={{ marginLeft: 8 }} onClick={chargerListeEntreprises}>Réessayer</button>
+                )}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <button
+                type="submit"
+                className="btn-add"
+                disabled={chargementEntreprises || enregistrementEntreprise || !listeEntreprises.some(e => String(e.id) === nouvelleEntrepriseId) || nouvelleEntrepriseId === String(contactAModifier.entreprise.id)}
+                style={{ margin: 0, width: 'auto', padding: '9px 18px' }}
+              >{enregistrementEntreprise ? 'Enregistrement…' : 'Enregistrer'}</button>
+              <button type="button" className="btn-cancel" disabled={enregistrementEntreprise} onClick={() => setContactAModifier(null)}>Annuler</button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* ── CONFIRMATION SUPPRESSION ── */}
       {confirmSuppr && (
